@@ -15,7 +15,8 @@ from pathlib import Path
 # ==========================================
 # [USER CONFIG]
 # ==========================================
-DATASET_ROOT = r"C:\Project\kaist\4_week\165.가상공간 환경음 매칭 데이터\01-1.정식개방데이터\Training\01.원천데이터"
+# Put your audio files in this folder to test!
+DATASET_ROOT = "sample_input"
 OUTPUT_ROOT = "preprocess_output"
 # ==========================================
 
