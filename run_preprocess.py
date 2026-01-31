@@ -16,7 +16,7 @@ from pathlib import Path
 # [USER CONFIG]
 # ==========================================
 # Put your audio files in this folder to test!
-DATASET_ROOT = "sample_input"
+DATASET_ROOT = r"C:\Project\kaist\4_week\165.가상공간 환경음 매칭 데이터\01-1.정식개방데이터\Training\01.원천데이터\TS_1.공간_1.현실 공간_환경_002.병원_wav"
 OUTPUT_ROOT = "preprocess_output"
 # ==========================================
 
