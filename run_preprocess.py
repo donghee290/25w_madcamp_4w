@@ -1,7 +1,9 @@
 """Single-script Audio Preprocessor.
 
-Runs the extraction pipeline on ALL files in a specified directory.
-Output is saved sequentially as sample_001, sample_002, etc.
+Runs Extraction only (NO Classification):
+1. Demucs (Separation)
+2. Onset Detection
+3. Slicing -> Save Raw Slices
 
 Usage:
     1. Edit the DATASET_ROOT variable below.
@@ -11,13 +13,14 @@ Usage:
 import sys
 import logging
 from pathlib import Path
+import numpy as np
 
 # ==========================================
 # [USER CONFIG]
 # ==========================================
 # Put your audio files in this folder to test!
 DATASET_ROOT = r"C:\Project\kaist\4_week\165.가상공간 환경음 매칭 데이터\01-1.정식개방데이터\Training\01.원천데이터\TS_1.공간_1.현실 공간_환경_002.병원_wav"
-OUTPUT_ROOT = "preprocess_output"
+OUTPUT_ROOT = "preprocess_output_raw"
 # ==========================================
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,14 +29,14 @@ logger = logging.getLogger("drumgenx")
 try:
     from drumgenx.separator import extract_drum_stem
     from drumgenx.detector import detect_onsets
-    from drumgenx.slicer import build_kit_from_audio
-    from drumgenx.utils import load_audio, ensure_dir
+    from drumgenx.slicer import slice_hits, normalize_hit
+    from drumgenx.utils import load_audio, save_audio, ensure_dir
 except ImportError:
     print("Error: drumgenx package not found.")
     sys.exit(1)
 
 def process_file(audio_path: Path, output_dir: Path):
-    """Process a single file and save to specific output_dir."""
+    """Process a single file: Separate -> Detect -> Slice -> Save Raw."""
     logger.info(f"=== Processing: {audio_path.name} -> {output_dir.name} ===")
     
     file_dir = ensure_dir(output_dir)
@@ -56,15 +59,29 @@ def process_file(audio_path: Path, output_dir: Path):
             logger.warning(f"No onsets in {audio_path.name}")
             return
 
-        # 4. Slicing
-        # Save directly to 'kit' inside the sample folder
-        kit_dir = file_dir / "kit"
-        build_kit_from_audio(
-            y, sr, onsets, kit_dir,
+        # 4. Slicing (Raw)
+        hits = slice_hits(
+            y, sr, onsets, 
             max_duration_s=1.5,
             fade_out_ms=10.0
         )
-        logger.info(f"Done: {kit_dir}")
+        
+        if not hits:
+            logger.warning("No hits sliced.")
+            return
+
+        # 5. Save Raw Slices (Dummy Data)
+        slices_dir = ensure_dir(file_dir / "slices")
+        logger.info(f"Saving {len(hits)} raw slices...")
+        
+        for i, hit in enumerate(hits):
+            # Normalize before saving? Usually good practice.
+            hit = normalize_hit(hit)
+            
+            fname = f"slice_{i:04d}.wav"
+            save_audio(slices_dir / fname, hit, sr)
+            
+        logger.info(f"Done: {slices_dir}")
         
     except Exception as e:
         logger.error(f"Failed {audio_path.name}: {e}")
