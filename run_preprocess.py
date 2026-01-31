@@ -1,9 +1,10 @@
 """Single-script Audio Preprocessor.
 
 Runs the extraction pipeline on ALL files in a specified directory.
+Output is saved sequentially as sample_001, sample_002, etc.
 
 Usage:
-    1. Edit the DATASET_ROOT variable below to point to your files.
+    1. Edit the DATASET_ROOT variable below.
     2. Run: python run_preprocess.py
 """
 
@@ -12,13 +13,12 @@ import logging
 from pathlib import Path
 
 # ==========================================
-# [USER CONFIG] Edit this path!
+# [USER CONFIG]
 # ==========================================
-# The folder containing your source audio files (mp3, wav, m4a...)
 DATASET_ROOT = r"C:\Project\kaist\4_week\165.가상공간 환경음 매칭 데이터\01-1.정식개방데이터\Training\01.원천데이터"
+OUTPUT_ROOT = "preprocess_output"
 # ==========================================
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("drumgenx")
 
@@ -28,14 +28,14 @@ try:
     from drumgenx.slicer import build_kit_from_audio
     from drumgenx.utils import load_audio, ensure_dir
 except ImportError:
-    print("Error: drumgenx package not found. Run this from the parent directory.")
+    print("Error: drumgenx package not found.")
     sys.exit(1)
 
-def process_file(audio_path: Path, output_root: Path):
-    """Process a single file."""
-    logger.info(f"=== Processing: {audio_path.name} ===")
+def process_file(audio_path: Path, output_dir: Path):
+    """Process a single file and save to specific output_dir."""
+    logger.info(f"=== Processing: {audio_path.name} -> {output_dir.name} ===")
     
-    file_dir = ensure_dir(output_root / audio_path.stem)
+    file_dir = ensure_dir(output_dir)
     
     try:
         # 1. Separation
@@ -56,6 +56,7 @@ def process_file(audio_path: Path, output_root: Path):
             return
 
         # 4. Slicing
+        # Save directly to 'kit' inside the sample folder
         kit_dir = file_dir / "kit"
         build_kit_from_audio(
             y, sr, onsets, kit_dir,
@@ -71,11 +72,9 @@ def main():
     root = Path(DATASET_ROOT)
     if not root.exists():
         print(f"Error: Dataset path not found: {root}")
-        print("Please edit DATASET_ROOT in run_preprocess.py")
         sys.exit(1)
 
     print(f"Scanning {root}...")
-    # Find common audio extensions
     extensions = ["*.wav", "*.mp3", "*.m4a", "*.flac"]
     files = []
     for ext in extensions:
@@ -87,11 +86,15 @@ def main():
 
     print(f"Found {len(files)} files. Starting processing...")
     
-    output_root = ensure_dir(Path("preprocess_output"))
+    out_root_path = ensure_dir(Path(OUTPUT_ROOT))
     
     for i, f in enumerate(files, 1):
-        print(f"\n[{i}/{len(files)}] {f.name}")
-        process_file(f, output_root)
+        # Format: sample_001, sample_002...
+        folder_name = f"sample_{i:03d}"
+        target_dir = out_root_path / folder_name
+        
+        print(f"\n[{i}/{len(files)}] {f.name} -> {folder_name}")
+        process_file(f, target_dir)
 
 if __name__ == "__main__":
     main()
