@@ -123,17 +123,18 @@ def filter_similar_hits(hits: list, sr: int, similarity_threshold: float = 0.88)
     return final_hits
 
 
-def process_file(audio_path: Path, output_dir: Path):
-    """Process file with Deduplication."""
-    logger.info(f"=== {audio_path.name} -> {output_dir.name} ===")
+def process_file(audio_path: Path, output_root: Path, file_idx: int):
+    """Process file and save FLATTENED results to output_root."""
+    logger.info(f"=== Processing [{file_idx}] {audio_path.name} ===")
     
-    file_dir = ensure_dir(output_dir)
+    # Temp folder for demucs (hidden from user)
+    temp_dir = ensure_dir(output_root / ".temp" / f"sample_{file_idx:03d}")
     
     try:
         # 1. Sep
         drums_path = extract_drum_stem(
             audio_path, 
-            file_dir / "demucs",
+            temp_dir,
             model="htdemucs",
             device="cuda" if sys.platform != "darwin" else "cpu"
         )
@@ -144,7 +145,6 @@ def process_file(audio_path: Path, output_dir: Path):
         # 3. Detect
         onsets = detect_onsets(y, sr, merge_ms=30, backtrack=True)
         if not onsets:
-            logger.warning("No onsets.")
             return
 
         # 4. Slice
@@ -152,21 +152,20 @@ def process_file(audio_path: Path, output_dir: Path):
         if not hits:
             return
             
-        # 5. [NEW] Filter / Dedup
-        raw_count = len(hits)
-        # 0.88 threshold is a good balance. Higher = more strict (more files), Lower = more loose (fewer files).
+        # 5. Filter / Dedup (Longest per cluster)
         unique_hits = filter_similar_hits(hits, sr, similarity_threshold=0.88)
         
-        # 6. Save
-        slices_dir = ensure_dir(file_dir / "slices")
-        logger.info(f"Saving {len(unique_hits)} unique slices (compressed from {raw_count})...")
+        # 6. Save FLATTENED (No subfolders!)
+        # Prefix with sample ID to prevent name collision
+        prefix = f"sample{file_idx:03d}"
         
         for i, hit in enumerate(unique_hits):
             hit = normalize_hit(hit)
-            fname = f"slice_unique_{i:03d}.wav"
-            save_audio(slices_dir / fname, hit, sr)
+            # e.g. preprocess_output/sample001_slice00.wav
+            fname = f"{prefix}_slice{i:02d}.wav"
+            save_audio(output_root / fname, hit, sr)
             
-        logger.info(f"Done.")
+        logger.info(f"Saved {len(unique_hits)} files to root.")
         
     except Exception as e:
         logger.error(f"Failed {audio_path.name}: {e}")
@@ -188,12 +187,12 @@ def main():
         sys.exit(1)
 
     print(f"Found {len(files)} files.")
+    
+    # Ensure Output Root exists
     out_root_path = ensure_dir(Path(OUTPUT_ROOT))
     
     for i, f in enumerate(files, 1):
-        folder_name = f"sample_{i:03d}"
-        target_dir = out_root_path / folder_name
-        process_file(f, target_dir)
+        process_file(f, out_root_path, i)
 
 if __name__ == "__main__":
     main()
