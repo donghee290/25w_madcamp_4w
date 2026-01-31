@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.cache/
+
+# Project Outputs
+outs/
+outs_grid/
+outs_model/
+outs_role/
+
+# System
+.DS_Store

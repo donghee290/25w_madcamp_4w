@@ -1,0 +1,57 @@
+version: 1
+
+roles:
+  CORE:
+    general:
+      - "A low and dull thump with strong impact, heavy and grounded."
+      - "A deep impact sound with most energy in low frequencies."
+      - "A short, heavy hit with fast attack and quick decay."
+      - "A muted knock or thud, not sharp, not metallic."
+      - "A strong pulse-like hit that feels like a beat backbone."
+      - "A solid bump or stomp-like impact with weight."
+      - "A dull percussive hit with low resonance."
+      - "A tight thump with minimal high-frequency sharpness."
+
+  ACCENT:
+    general:
+      - "A sharp percussive hit that cuts through, bright and snappy."
+      - "A crisp transient with mid-frequency focus."
+      - "A punchy hit with strong attack and moderate decay."
+      - "A clack or snap sound with clear onset."
+      - "A strong accented hit, more sharp than heavy."
+      - "A bright percussive strike with noticeable edge."
+      - "A short explosive hit with clear definition."
+      - "A prominent attack sound, not sustained noise."
+
+  MOTION:
+    general:
+      - "A light, short, repeated clicking or ticking sound."
+      - "Fast small percussive sounds that add rhythmic motion."
+      - "A tight, bright, very short tick with quick decay."
+      - "A metallic or plasticky small click, thin and high-pitched."
+      - "A sequence-like tiny hits suitable for dense rhythm."
+      - "A repetitive crisp texture made of many short transients."
+      - "A delicate percussive tap, thin and quick."
+      - "A rapid staccato sound with lots of small onsets."
+
+  FILL:
+    general:
+      - "A rolling burst of percussive hits, like a short flourish."
+      - "A tumbling or stuttering pattern with variation."
+      - "A multi-hit transient cluster that works as a transition."
+      - "A dramatic percussive moment, longer or more complex than a single hit."
+      - "A short run of hits that signals an ending or change."
+      - "A varied percussive phrase, not a steady pulse."
+      - "A busy percussive segment, louder and more noticeable."
+      - "A short chaotic percussive event with movement."
+
+  TEXTURE:
+    general:
+      - "Continuous background noise with little distinct onset."
+      - "Ambient room tone or steady air noise, sustained."
+      - "Wind-like or hiss-like noise that lasts over time."
+      - "A constant noisy layer, not percussive."
+      - "A sustained atmosphere sound with weak transients."
+      - "A long steady sound bed, more texture than hits."
+      - "A continuous rustle or wash that fills space."
+      - "A sustained noise floor, not rhythmic by itself."

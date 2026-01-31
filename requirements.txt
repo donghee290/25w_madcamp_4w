@@ -1,0 +1,21 @@
+# ===== Core =====
+numpy>=1.24
+scipy>=1.11
+pyyaml>=6.0
+tqdm>=4.66
+
+# ===== Audio DSP =====
+librosa>=0.10
+soundfile>=0.12
+resampy>=0.4
+
+# ===== ML / CLAP =====
+torch>=2.1
+torchaudio>=2.1
+transformers>=4.36
+
+# ===== Utils =====
+scikit-learn>=1.3
+
+# === music / sequence ===
+note-seq==0.0.5
