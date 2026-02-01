@@ -11,22 +11,22 @@ import random
 import re
 from tqdm import tqdm
 
-from role_assignment.role_assigner import (
+from stage2_role_assignment.role_assigner import (
     RoleAssigner,
     RoleAssignerConfig,
 )
-from role_assignment.dsp.audio_io import AudioLoadConfig
-from role_assignment.dsp.features import DSPConfig
-from role_assignment.dsp.rule_scoring import (
+from stage2_role_assignment.dsp.audio_io import AudioLoadConfig
+from stage2_role_assignment.dsp.features import DSPConfig
+from stage2_role_assignment.dsp.rule_scoring import (
     RuleScoringConfig,
     RuleWeights,
     TexturePenaltyConfig,
 )
-from role_assignment.clap.backend import ClapBackendConfig
-from role_assignment.clap.scoring import ClapScoringConfig
-from role_assignment.fusion.fuse import FusionConfig
-from role_assignment.fusion.guards import GuardsConfig, TextureSuppressConfig, SustainedNoiseSuppressConfig, MotionMinConditionConfig, FillConservativeConfig, LowConfTextureExtraSuppressConfig
-from role_assignment.pool.build_pools import PoolConfig, build_pools, pools_to_json_dict
+from stage2_role_assignment.clap.backend import ClapBackendConfig
+from stage2_role_assignment.clap.scoring import ClapScoringConfig
+from stage2_role_assignment.fusion.fuse import FusionConfig
+from stage2_role_assignment.fusion.guards import GuardsConfig, TextureSuppressConfig, SustainedNoiseSuppressConfig, MotionMinConditionConfig, FillConservativeConfig, LowConfTextureExtraSuppressConfig
+from stage2_role_assignment.pool.build_pools import PoolConfig, build_pools, pools_to_json_dict
 
 
 AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}

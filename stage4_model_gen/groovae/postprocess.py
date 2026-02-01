@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Dict, List
 from note_seq.protobuf import music_pb2
 
-from model_gen.groovae.mapping import PITCH_TO_ROLE
+from stage4_model_gen.groovae.mapping import PITCH_TO_ROLE
 
 
 def quantize_and_filter(

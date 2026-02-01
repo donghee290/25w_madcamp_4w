@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 
 
-from beat_grid.grid import GridConfig, build_grid
-from beat_grid.patterns.skeleton import SkeletonConfig, build_skeleton_events
+from stage3_beat_grid.grid import GridConfig, build_grid
+from stage3_beat_grid.patterns.skeleton import SkeletonConfig, build_skeleton_events
 
 
 AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
@@ -236,7 +236,7 @@ def main() -> None:
 
     # 4) render
     try:
-        from beat_grid.test_audio_render.render import render_events
+        from stage3_beat_grid.test_audio_render.render import render_events
 
         sample_root = Path(args.sample_root)
         print(f"[INFO] Rendering audio to {base_wav} ...")
@@ -251,7 +251,7 @@ def main() -> None:
         )
         print("[DONE] audio rendered:", str(base_wav))
     except ImportError:
-        print("[WARN] Could not import beat_grid.test_audio_render.render. Audio not generated.")
+        print("[WARN] Could not import stage3_beat_grid.test_audio_render.render. Audio not generated.")
     except Exception as e:
         print(f"[ERROR] Audio rendering failed: {e}")
 

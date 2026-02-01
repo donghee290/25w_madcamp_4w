@@ -4,11 +4,11 @@ from __future__ import annotations
 import argparse, json
 from pathlib import Path
 
-from model_gen.groovae.to_noteseq import events_to_notesequence
-from model_gen.groovae.runner import GrooVAERunner
-from model_gen.groovae.postprocess import quantize_and_filter
-from model_gen.groovae.from_noteseq import noteseq_to_events
-from beat_grid.test_audio_render.render import render_events
+from stage4_model_gen.groovae.to_noteseq import events_to_notesequence
+from stage4_model_gen.groovae.runner import GrooVAERunner
+from stage4_model_gen.groovae.postprocess import quantize_and_filter
+from stage4_model_gen.groovae.from_noteseq import noteseq_to_events
+from stage3_beat_grid.test_audio_render.render import render_events
 
 
 def main():

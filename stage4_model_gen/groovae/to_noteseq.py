@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Dict, List
 from note_seq.protobuf import music_pb2
 
-from model_gen.groovae.mapping import ROLE_TO_PITCHES
+from stage4_model_gen.groovae.mapping import ROLE_TO_PITCHES
 
 
 def events_to_notesequence(

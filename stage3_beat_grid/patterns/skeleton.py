@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 import random
 
-from beat_grid.events import Event, vel_from_energy
+from stage3_beat_grid.events import Event, vel_from_energy
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,7 @@ def build_skeleton_events(
 
     events: List[Event] = []
 
-    from beat_grid.events import dur_from_decay  # Lazy import to avoid circular if any
+    from stage3_beat_grid.events import dur_from_decay  # Lazy import to avoid circular if any
 
     # ---- CORE skeleton: 0,4,8,12
     if core_sample:

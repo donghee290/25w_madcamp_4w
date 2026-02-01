@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Dict, List
-from model_gen.groovae.mapping import PITCH_TO_ROLE
+from stage4_model_gen.groovae.mapping import PITCH_TO_ROLE
 
 
 def noteseq_to_events(
