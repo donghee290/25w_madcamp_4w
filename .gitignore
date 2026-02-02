@@ -12,6 +12,8 @@ outs_model/
 outs_role/
 examples/
 input_samples/
+data/
+dummy_dataset*/
 
 # System
 .DS_Store
