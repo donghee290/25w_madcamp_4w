@@ -19,3 +19,8 @@ scikit-learn>=1.3
 
 # === music / sequence ===
 note-seq==0.0.5
+
+# ===== Backend =====
+flask>=2.3
+gunicorn>=21.2
+pymongo>=4.6
