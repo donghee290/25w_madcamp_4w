@@ -9,6 +9,7 @@ import numpy as np
 
 from .scoring import DrumRole, calculate_role_scores, get_best_role
 from .features import extract_dsp_features
+from .dedup import deduplicate_hits
 from .utils import logger, save_audio, ensure_dir
 
 
@@ -16,26 +17,31 @@ def slice_hits(
     y_drums: np.ndarray,
     sr: int,
     onsets: List[int],
-    max_duration_s: float = 0.5,
+    max_duration_s: float = 2.0,
     fade_out_ms: float = 50.0,
-    trim_db: float = 40.0,
+    trim_db: float = 60.0,
+    min_duration_s: float = 0.05,
 ) -> List[np.ndarray]:
     """Extract individual drum hits from onset positions.
 
-    Each hit spans from onset to next onset (or onset + max_duration_s).
+    Each hit spans from onset to min(next_onset, onset+max_duration).
+    A minimum duration is guaranteed so release tails are preserved.
     Applies fade-out and trims trailing silence.
     """
     hits = []
     fade_samples = int(fade_out_ms / 1000.0 * sr)
     max_samples = int(max_duration_s * sr)
+    min_samples = int(min_duration_s * sr)
 
     for i, onset in enumerate(onsets):
-        # End = next onset or onset + max_duration
+        # End = next onset or onset + max_duration, but at least min_duration
         if i + 1 < len(onsets):
-            end = min(onsets[i + 1], onset + max_samples)
+            next_onset = onsets[i + 1]
+            end = min(max(next_onset, onset + min_samples), onset + max_samples)
         else:
             end = min(onset + max_samples, len(y_drums))
 
+        end = min(end, len(y_drums))
         hit = y_drums[onset:end].copy()
 
         if hit.size == 0:
@@ -149,19 +155,85 @@ def save_kit(
     return manifest_path
 
 
+def save_deduped_kit(
+    representatives: List[np.ndarray],
+    sr: int,
+    output_dir: Path,
+    dedup_stats: dict,
+    normalize: bool = True,
+) -> Path:
+    """Save deduplicated hits to a flat samples/ directory.
+
+    Returns path to kit_manifest.json.
+    """
+    output_dir = ensure_dir(output_dir)
+    samples_dir = ensure_dir(output_dir / "samples")
+
+    samples_info = []
+    for i, hit in enumerate(representatives, start=1):
+        feats = extract_dsp_features(hit, sr)
+
+        if normalize:
+            hit = normalize_hit(hit)
+
+        fname = f"sample_{i:03d}.wav"
+        save_audio(samples_dir / fname, hit, sr)
+        samples_info.append({
+            "file": fname,
+            "duration_s": round(len(hit) / sr, 4),
+            "features": feats,
+            "cluster_id": i,
+        })
+
+    manifest = {
+        "sr": sr,
+        "total_samples": len(representatives),
+        "dedup_stats": dedup_stats,
+        "samples": samples_info,
+    }
+
+    manifest_path = output_dir / "kit_manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(f"Deduped kit saved: {len(representatives)} samples -> {output_dir}")
+    return manifest_path
+
+
 def build_kit_from_audio(
     y_drums: np.ndarray,
     sr: int,
     onsets: List[int],
     output_dir: Path,
-    max_duration_s: float = 0.5,
+    max_duration_s: float = 2.0,
     fade_out_ms: float = 50.0,
-) -> Tuple[Path, Dict[DrumRole, List[np.ndarray]]]:
-    """Full pipeline: slice -> classify -> organize -> save.
+    trim_db: float = 60.0,
+    min_hit_duration_s: float = 0.0,
+    dedup_enabled: bool = True,
+    dedup_threshold: float = 0.5,
+) -> Tuple[Path, List[np.ndarray]]:
+    """Full pipeline: slice -> filter short -> deduplicate -> save.
 
-    Returns (manifest_path, organized_dict).
+    Returns (manifest_path, representative_hits).
     """
-    hits = slice_hits(y_drums, sr, onsets, max_duration_s, fade_out_ms)
-    organized, hit_data = classify_and_organize(hits, sr)
-    manifest_path = save_kit(organized, sr, output_dir, hit_data=hit_data)
-    return manifest_path, organized
+    hits = slice_hits(y_drums, sr, onsets, max_duration_s, fade_out_ms, trim_db)
+
+    # Filter out hits shorter than min_hit_duration_s
+    min_samples = int(min_hit_duration_s * sr)
+    before = len(hits)
+    hits = [h for h in hits if len(h) >= min_samples]
+    if before != len(hits):
+        logger.info(f"Filtered {before - len(hits)} short hits (<{min_hit_duration_s}s), {len(hits)} remaining")
+
+    if dedup_enabled:
+        representatives, dedup_stats = deduplicate_hits(hits, sr, threshold=dedup_threshold)
+        manifest_path = save_deduped_kit(representatives, sr, output_dir, dedup_stats)
+        return manifest_path, representatives
+    else:
+        # Fallback: old classify-and-organize path
+        organized, hit_data = classify_and_organize(hits, sr)
+        manifest_path = save_kit(organized, sr, output_dir, hit_data=hit_data)
+        # Flatten for consistent return type
+        all_hits = [h for role_hits in organized.values() for h in role_hits]
+        return manifest_path, all_hits

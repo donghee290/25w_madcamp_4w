@@ -164,7 +164,7 @@ def main() -> None:
         y, _ = load_audio(args.input, sr=args.sr)
         onsets = detect_onsets(y, args.sr)
         output_dir = args.output_dir or (args.input.parent / f"{args.input.stem}_kit")
-        manifest_path, organized = build_kit_from_audio(
+        manifest_path, samples = build_kit_from_audio(
             y, args.sr, onsets, output_dir,
         )
         print(f"Kit manifest: {manifest_path}")

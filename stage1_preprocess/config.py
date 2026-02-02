@@ -93,6 +93,11 @@ class PipelineConfig:
     # Sequencer
     max_poly: int = 3           # max simultaneous sounds per step
 
+    # Deduplication
+    dedup_enabled: bool = True
+    dedup_threshold: float = 0.5  # cosine distance threshold
+    min_hit_duration_s: float = 0.0  # discard hits shorter than this (0=no filter)
+
     # ML features (disabled by default)
     yamnet_enabled: bool = False
     groovae_enabled: bool = False
