@@ -10,6 +10,7 @@ outs/
 outs_grid/
 outs_model/
 outs_role/
+outs_transformer/
 examples/
 input_samples/
 
