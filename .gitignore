@@ -119,4 +119,5 @@ cython_debug/
 
 # Large Models & Checkpoints
 checkpoints/
-groovae_output_*.mid
+groovae_output_*.midmodel/stage4_model_gen/drums_transformer/models/
+*.pth
