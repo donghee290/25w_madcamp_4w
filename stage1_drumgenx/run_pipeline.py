@@ -54,12 +54,16 @@ def process_single_file(
             logger.warning(f"No onsets detected in {audio_path.name}")
             return None
 
-        # Step 4: Slice, classify, organize
+        # Step 4: Slice, deduplicate, save
         kit_dir = file_dir / "kit"
-        manifest_path, organized = build_kit_from_audio(
+        manifest_path, samples = build_kit_from_audio(
             y_drums, config.sr, onsets, kit_dir,
             max_duration_s=config.max_hit_duration_s,
             fade_out_ms=config.fade_out_ms,
+            trim_db=config.trim_silence_db,
+            min_hit_duration_s=config.min_hit_duration_s,
+            dedup_enabled=config.dedup_enabled,
+            dedup_threshold=config.dedup_threshold,
         )
 
         return kit_dir

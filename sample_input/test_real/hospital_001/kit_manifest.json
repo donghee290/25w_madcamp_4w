@@ -1,0 +1,208 @@
+{
+  "sr": 44100,
+  "total_samples": 13,
+  "dedup_stats": {
+    "total_hits": 1714,
+    "n_clusters": 13,
+    "n_representatives": 13,
+    "cluster_sizes": [
+      34,
+      11,
+      13,
+      1601,
+      25,
+      1,
+      1,
+      2,
+      4,
+      15,
+      2,
+      4,
+      1
+    ]
+  },
+  "samples": [
+    {
+      "file": "sample_001.wav",
+      "duration_s": 0.1625,
+      "features": {
+        "energy": 0.07704222947359085,
+        "sharpness": 0.3592664400736491,
+        "band_low": 0.19969895400765905,
+        "band_mid": 0.5879279288737173,
+        "band_high": 0.212373142385233,
+        "attack_time": 0.013061224489795919,
+        "decay_time": 0.12770975056689343
+      },
+      "cluster_id": 1
+    },
+    {
+      "file": "sample_002.wav",
+      "duration_s": 0.05,
+      "features": {
+        "energy": 0.1196495071053505,
+        "sharpness": 0.18119481404622395,
+        "band_low": 0.13326836580291632,
+        "band_mid": 0.46893700999953786,
+        "band_high": 0.39779458335749335,
+        "attack_time": 0.04789115646258504,
+        "decay_time": 0.0029024943310657597
+      },
+      "cluster_id": 2
+    },
+    {
+      "file": "sample_003.wav",
+      "duration_s": 0.1045,
+      "features": {
+        "energy": 0.3046993911266327,
+        "sharpness": 0.1636595408121745,
+        "band_low": 0.16075021141212734,
+        "band_mid": 0.7961178318911558,
+        "band_high": 0.043131938496700106,
+        "attack_time": 0.029024943310657598,
+        "decay_time": 0.0653061224489796
+      },
+      "cluster_id": 3
+    },
+    {
+      "file": "sample_004.wav",
+      "duration_s": 0.1741,
+      "features": {
+        "energy": 0.12766611576080322,
+        "sharpness": 0.21985532442728678,
+        "band_low": 0.420780328455147,
+        "band_mid": 0.47848117017235164,
+        "band_high": 0.10073847822386517,
+        "attack_time": 0.0783673469387755,
+        "decay_time": 0.08126984126984127
+      },
+      "cluster_id": 4
+    },
+    {
+      "file": "sample_005.wav",
+      "duration_s": 0.0929,
+      "features": {
+        "energy": 0.08780086040496826,
+        "sharpness": 0.18040138880411785,
+        "band_low": 0.3791586455412215,
+        "band_mid": 0.3445767437772493,
+        "band_high": 0.2762646899982765,
+        "attack_time": 0.005804988662131519,
+        "decay_time": 0.07691609977324262
+      },
+      "cluster_id": 5
+    },
+    {
+      "file": "sample_006.wav",
+      "duration_s": 0.05,
+      "features": {
+        "energy": 0.21118107438087463,
+        "sharpness": 0.4541490872701009,
+        "band_low": 0.33260315015802255,
+        "band_mid": 0.5560659724431344,
+        "band_high": 0.11133086225445443,
+        "attack_time": 0.036281179138321996,
+        "decay_time": 0.014512471655328799
+      },
+      "cluster_id": 6
+    },
+    {
+      "file": "sample_007.wav",
+      "duration_s": 0.1741,
+      "features": {
+        "energy": 0.17310172319412231,
+        "sharpness": 0.18409827550252278,
+        "band_low": 0.11461383527244984,
+        "band_mid": 0.5413432350829074,
+        "band_high": 0.34404290651327474,
+        "attack_time": 0.034829931972789115,
+        "decay_time": 0.12480725623582767
+      },
+      "cluster_id": 7
+    },
+    {
+      "file": "sample_008.wav",
+      "duration_s": 0.05,
+      "features": {
+        "energy": 0.16142211854457855,
+        "sharpness": 0.6472267786661784,
+        "band_low": 0.06865973558576084,
+        "band_mid": 0.19227264832215324,
+        "band_high": 0.7390676107109093,
+        "attack_time": 0.03918367346938775,
+        "decay_time": 0.011609977324263039
+      },
+      "cluster_id": 8
+    },
+    {
+      "file": "sample_009.wav",
+      "duration_s": 0.1045,
+      "features": {
+        "energy": 0.05022437497973442,
+        "sharpness": 0.41648085912068683,
+        "band_low": 0.08735862008208957,
+        "band_mid": 0.36261603702725964,
+        "band_high": 0.5500253760940226,
+        "attack_time": 0.01886621315192744,
+        "decay_time": 0.07691609977324262
+      },
+      "cluster_id": 9
+    },
+    {
+      "file": "sample_010.wav",
+      "duration_s": 0.1858,
+      "features": {
+        "energy": 0.046116288751363754,
+        "sharpness": 0.17968746821085613,
+        "band_low": 0.13192420207491037,
+        "band_mid": 0.36768377679915015,
+        "band_high": 0.5003920655911241,
+        "attack_time": 0.005804988662131519,
+        "decay_time": 0.16834467120181407
+      },
+      "cluster_id": 10
+    },
+    {
+      "file": "sample_011.wav",
+      "duration_s": 0.058,
+      "features": {
+        "energy": 0.15990163385868073,
+        "sharpness": 0.11059600512186686,
+        "band_low": 0.03699565117076494,
+        "band_mid": 0.16406456982177212,
+        "band_high": 0.7989397875282366,
+        "attack_time": 0.004353741496598639,
+        "decay_time": 0.04498866213151927
+      },
+      "cluster_id": 11
+    },
+    {
+      "file": "sample_012.wav",
+      "duration_s": 0.0697,
+      "features": {
+        "energy": 0.08482000231742859,
+        "sharpness": 0.12101856072743734,
+        "band_low": 0.07221759301933571,
+        "band_mid": 0.2695001421149686,
+        "band_high": 0.6582822902165864,
+        "attack_time": 0.004353741496598639,
+        "decay_time": 0.06095238095238095
+      },
+      "cluster_id": 12
+    },
+    {
+      "file": "sample_013.wav",
+      "duration_s": 0.0813,
+      "features": {
+        "energy": 0.20291514694690704,
+        "sharpness": 0.18141347567240398,
+        "band_low": 0.06883036319462796,
+        "band_mid": 0.24363604592279486,
+        "band_high": 0.6875336329678953,
+        "attack_time": 0.0072562358276643995,
+        "decay_time": 0.056598639455782314
+      },
+      "cluster_id": 13
+    }
+  ]
+}

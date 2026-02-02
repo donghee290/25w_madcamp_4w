@@ -1,0 +1,43 @@
+{
+  "sr": 44100,
+  "total_samples": 2,
+  "dedup_stats": {
+    "total_hits": 1706,
+    "n_clusters": 2,
+    "n_representatives": 2,
+    "cluster_sizes": [
+      19,
+      1687
+    ]
+  },
+  "samples": [
+    {
+      "file": "sample_001.wav",
+      "duration_s": 0.0813,
+      "features": {
+        "energy": 0.23008082807064056,
+        "sharpness": 0.16741771697998048,
+        "band_low": 0.061856776919392426,
+        "band_mid": 0.8169111963643135,
+        "band_high": 0.12123203804366155,
+        "attack_time": 0.005804988662131519,
+        "decay_time": 0.07111111111111111
+      },
+      "cluster_id": 1
+    },
+    {
+      "file": "sample_002.wav",
+      "duration_s": 0.0813,
+      "features": {
+        "energy": 0.17905068397521973,
+        "sharpness": 0.1230483849843343,
+        "band_low": 0.10730008455174264,
+        "band_mid": 0.7572205896615813,
+        "band_high": 0.1354792822053908,
+        "attack_time": 0.01596371882086168,
+        "decay_time": 0.058049886621315196
+      },
+      "cluster_id": 2
+    }
+  ]
+}
