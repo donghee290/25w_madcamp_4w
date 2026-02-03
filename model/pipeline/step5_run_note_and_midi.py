@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 from typing import Any, Dict
+import copy
 
 import sys
 # Add model dir to sys.path
@@ -68,6 +69,42 @@ def main() -> None:
         ),
     )
 
+    # Pre-scan notes to check if we need to expand the grid
+    max_note_bar = 0
+    for n in notes:
+        # Check both legacy 'start' and new 'bar'
+        if "bar" in n:
+            max_note_bar = max(max_note_bar, int(n["bar"]))
+        elif "start" in n:
+            # Estimate bar from time (approx)
+            t = float(n["start"])
+            if grid.tbar > 0:
+                b = int(t / grid.tbar)
+                max_note_bar = max(max_note_bar, b)
+    
+    # If notes exceed current grid (e.g. 4 bars), REBUILD grid to fit them.
+    # (+1 because bar index is 0-based)
+    needed_bars = max_note_bar + 1
+    if needed_bars > grid.num_bars:
+        print(f"[INFO] Expanding grid from {grid.num_bars} to {needed_bars} bars to fit content.")
+        from stage3_beat_grid.grid import build_grid
+        # Update config and rebuild
+        # We need to hackily update the frozen dataclass or just create new one
+        # GridConfig is frozen? Let's assume we can re-instantiate.
+        new_gcfg = copy.deepcopy(grid.cfg)
+        # dataclass.replace or just simple modification if not frozen? 
+        # It's likely frozen. Let's assume we can map it.
+        # Check grid.py? It's better to just re-create GridConfig.
+        from stage3_beat_grid.grid import GridConfig
+        new_gcfg = GridConfig(
+            bpm=grid.cfg.bpm,
+            num_bars=needed_bars,
+            steps_per_bar=grid.cfg.steps_per_bar,
+            meter_numer=grid.cfg.meter_numer,
+            meter_denom=grid.cfg.meter_denom,
+        )
+        grid = build_grid(new_gcfg)
+
     base_loop_events = normalize_notes_to_event_grid(
         grid=grid,
         notes=notes,
@@ -80,9 +117,21 @@ def main() -> None:
     # and use THAT as the main output.
     if int(args.progressive) == 1:
         print("[INFO] Building progressive song structure...")
+        
+        # Auto-detect input length to avoid truncating AI generation
+        max_in_bar = 0
+        if base_loop_events:
+            max_in_bar = max(int(e.bar) for e in base_loop_events)
+        input_len = max_in_bar + 1
+        
+        # Use the larger of input_len or requested segment_bars
+        # This ensures we don't throw away AI content if it generated 16 bars but default is 4.
+        final_seg_bars = max(input_len, int(args.segment_bars))
+        print(f"[INFO] Auto-detected input length: {input_len} bars. Setting segment_bars to {final_seg_bars}.")
+
         layers = tuple([x.strip().upper() for x in str(args.layers).split(",") if x.strip()])
         pcfg = ProgressiveConfig(
-            segment_bars=int(args.segment_bars), 
+            segment_bars=final_seg_bars, 
             layers=layers,
             final_repeat=int(args.repeat_full)
         )

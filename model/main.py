@@ -85,24 +85,23 @@ def main():
     # Find latest pools.json
     pools_json = get_latest_file(dirs["s2"], "role_pools_*.json")
     
-    # Stage 3: Grid & Skeleton
+    # Stage 3: Grid Setup
     run_step("step3_run_grid_and_skeleton.py", [
-        "--pools_json", str(pools_json),
         "--out_dir", str(dirs["s3"]),
         "--bpm", str(args.bpm),
+        "--style", str(args.style),
         "--seed", str(args.seed),
-        "--style", str(args.style), # Pass style
-        "--sample_root", str(dirs["s1"]) # Render needs samples
+        "--pools_json", str(pools_json)
     ])
     
     # Find generated files
     grid_json = get_latest_file(dirs["s3"], "grid_*.json")
-    event_grid_json = get_latest_file(dirs["s3"], "event_grid_*.json")
+    skeleton_json = get_latest_file(dirs["s3"], "skeleton_*.json")
     
-    # Stage 4: Model Transformer
+    # Stage 4: Model Transformer (Generator)
     run_step("step4_run_model_transformer.py", [
         "--grid_json", str(grid_json),
-        "--events_json", str(event_grid_json),
+        "--skeleton_json", str(skeleton_json),
         "--pools_json", str(pools_json),
         "--out_dir", str(dirs["s4"]),
         "--seed", str(args.seed),
@@ -118,7 +117,9 @@ def main():
         "--notes_json", str(notes_json),
         "--pools_json", str(pools_json),
         "--out_dir", str(dirs["s5"]),
-        "--seed", str(args.seed)
+        "--seed", str(args.seed),
+        "--progressive", "1",      # Explicitly enable progressive
+        "--repeat_full", "8"       # Increase loop count to meet >40 bars requirement (4*4 + 4*8 = 16+32 = 48 bars)
     ])
     
     final_events_json = get_latest_file(dirs["s5"], "event_grid_*.json")

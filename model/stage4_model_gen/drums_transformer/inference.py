@@ -84,19 +84,17 @@ class DrumsTransformerRunner:
         else:
             logger.info(f"Model found at {local_path}")
 
-    def generate_beat(self, max_tokens=512, temperature=0.9):
+    def generate_beat(self, max_tokens=512, temperature=0.9, start_token=291):
         """
-        Generates a drum beat from scratch.
-        Using a random 'Time Shift' token as seed similar to the original script.
+        Generates a drum beat.
+        Default start_token=291 (MIDI 35 Acoustic Bass Drum).
+        This forces the model to start with a Kick, ensuring a strong downbeat.
         """
-        # Seed with a random time shift (1-32)
-        import random
-        start_token = random.randint(1, 32)
         outy = [start_token]
         
         inp = torch.tensor([outy], dtype=torch.long).to(self.device)
         
-        logger.info(f"Generating beat with seed {start_token}...")
+        logger.info(f"Generating beat with seed token {start_token} (Kick)...")
         
         with self.ctx:
             with torch.no_grad():

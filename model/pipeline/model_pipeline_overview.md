@@ -38,29 +38,31 @@ The pipeline transforms raw audio inputs into a fully produced, role-assigned, a
     - `role_pools_{ver}.json` (Sample paths grouped by role)
     - `role_assignment_debug_{ver}.json` (Detailed debug scores)
 
-## Step 3: Grid & Skeleton (`step3_run_grid_and_skeleton.py`)
-**Goal**: Create the rhythmic foundation (Grid) and initial pattern (Skeleton).
-- **Input**: `role_pools.json` (or random selection), BPM, bars, seed.
-- **Process**:
-    1.  **Grid**: Defines the timeline (BPM, meter, steps).
-    2.  **Skeleton**: Generates a base pattern of "events" (Core, Accent, etc.) without specific sample choices yet.
-    3.  **Generators**: Uses `beat_grid` logic to create style-based skeletons (Rock, House, etc.).
-- **Output**: 
-    - `grid_{ver}.json` (Time structure)
-    - `event_grid_{ver}.json` (Abstract events)
-    - `skeleton_meta_{ver}.json`
 
-## Step 4: Model Transformer (`step4_run_model_transformer.py`)
-**Goal**: Generate complex rhythmic patterns using a trained Transformer model.
-- **Input**: Grid, Pools, and optionally a seed.
+
+## Step 3: Grid Setup (`step3_run_grid_and_skeleton.py`)
+**Goal**: Create the "Container" (Grid, BPM, Bars).
+- **Input**: BPM, bars.
 - **Process**:
-    1.  **DrumsTransformerRunner**: Initializes the transformer model.
-    2.  **Inference**: Generates a sequence of tokens representing drum hits.
-    3.  **Token to MIDI**: Converts tokens to MIDI.
-    4.  **MIDI to Events**: Parses MIDI back into the pipeline's event format (`start`, `velocity`, `role`, `micro_offset`).
+    1.  **Grid Setup**: Defines the timeline (BPM, meter, steps). This is the *Standardized Format*.
+- **Output**: 
+    - `grid_{ver}.json` (The essential "Container")
+
+
+
+
+## Step 4: AI Generator (`step4_run_model_transformer.py`)
+**Goal**: Generate complex rhythmic patterns using a trained Transformer model (Causal LM).
+- **Input**: `grid.json` (for BPM/Bar context), `role_pools.json`.
+- **Process**:
+    1.  **Initialization**: Loads `Ultimate_Drums_Transformer`.
+    2.  **Generation**: Generates a drum pattern from scratch (using the Setup from Stage 3). It does *not* modify the Stage 3 skeleton; it populates the empty grid.
+    3.  **MIDI Decoding**: Converts model tokens to MIDI.
+    4.  **Event Mapping**: Parses MIDI into the pipeline's event format (`Core`, `Accent`, `Motion`, etc.) based on pitch.
 - **Output**: 
     - `transformer_output_{ver}.mid`
-    - `event_grid_transformer_{ver}.json`
+    - `event_grid_transformer_{ver}.json` (The "AI Generated" Content)
+
 
 ## Step 5: Note & Layout (`step5_run_note_and_midi.py`)
 **Goal**: Finalize note placement, assign specific samples, and build song structure.
