@@ -10,7 +10,7 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from .utils import logger, set_torch_home, load_audio, save_audio, ensure_dir
+from ..io.utils import logger, set_torch_home, load_audio, save_audio, ensure_dir
 
 
 def run_demucs_full(

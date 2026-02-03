@@ -6,7 +6,7 @@ import librosa
 import numpy as np
 from scipy.signal import butter, filtfilt
 
-from .utils import logger
+from ..io.utils import logger
 
 
 def _bandpass(y: np.ndarray, sr: int, low: float, high: float, order: int = 4) -> np.ndarray:

@@ -3,21 +3,18 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 
 from .config import PipelineConfig
-from .scoring import DrumRole, calculate_role_scores
-from .features import extract_dsp_features
-from .ingest import scan_dataset, random_sample
-from .separator import extract_drum_stem
-from .detector import detect_onsets
-from .slicer import build_kit_from_audio, normalize_hit
+from .io.ingest import scan_dataset, random_sample
+from .separation.separator import extract_drum_stem
+from .analysis.detector import detect_onsets
+from .slicing.slicer import build_kit_from_audio, normalize_hit
 from .sequencer import load_kit, render_and_save
-from .utils import logger, load_audio, save_audio, ensure_dir
-from .pool_balancer import balance_pools
-from .events import generate_skeleton, EventGrid
+from .io.utils import logger, load_audio, save_audio, ensure_dir
+from .events import generate_skeleton
 
 def process_single_file(
     audio_path: Path,
@@ -56,7 +53,7 @@ def process_single_file(
 
         # Step 4: Slice, deduplicate, save
         kit_dir = file_dir / "kit"
-        manifest_path, samples = build_kit_from_audio(
+        _manifest_path, _representatives = build_kit_from_audio(
             y_drums, config.sr, onsets, kit_dir,
             max_duration_s=config.max_hit_duration_s,
             fade_out_ms=config.fade_out_ms,
@@ -79,96 +76,57 @@ def merge_kits(
     sr: int = 44100,
     best_per_class: int = 20,
 ) -> Path:
-    """Merge kits and BALANCE pools using pool_balancer."""
+    """Merge kits into master kit (simplified - no role balancing)."""
     master_dir = ensure_dir(output_dir / "master_kit")
-    
-    # 1. Gather all samples and calculate scores
-    all_items = []
-    all_scores = []
-    current_assignments = []
-    
-    # Track origin for debugging/metadata
-    origins = [] 
 
-    logger.info("Merging kits and re-scoring for balancing...")
-    
+    # Gather all samples from all kits
+    all_samples = []
+    origins = []
+
+    logger.info("Merging kits (simplified - no role classification)...")
+
     for kit_dir in kit_dirs:
         kit = load_kit(kit_dir, sr=sr)
-        for role, samples in kit.items():
-            for i, s in enumerate(samples):
-                # Recalculate scores for balancing logic
-                feats = extract_dsp_features(s, sr)
-                scores = calculate_role_scores(feats)
-                # Convert DrumRole enum keys to scores
-                # pool_balancer expects Dict[DrumRole, float]
-                
-                all_items.append(s)
-                all_scores.append(scores)
-                current_assignments.append(role)
-                origins.append(f"{kit_dir.name}/{role.value}_{i}")
+        for role, role_samples in kit.items():
+            role_name = role.value if hasattr(role, 'value') else str(role)
+            for i, s in enumerate(role_samples):
+                all_samples.append(s)
+                origins.append(f"{kit_dir.name}/{role_name}_{i}")
 
-    # 2. Run Pool Balancer
-    # Initial pool structure for balancer
-    # Actually balancer takes lists directly.
-    # We construct initial pools just to check counts? Balancer re-builds them.
-    
-    # Create dummy pool dict for input if needed, but balancer mainly needs the lists.
-    # wait, balance_pools signature:
-    # (pools: Dict, all_scores, all_items, pool_assignments, ...)
-    # It requires 'pools' but seemingly rebuilds it? Let's verify pool_balancer.py
-    # assignments = list(pool_assignments) ... returns balanced, assignments
-    
-    dummy_pools = {r: [] for r in DrumRole} # Not strictly used for logic, just typings
-    
-    balanced_pool, new_assignments = balance_pools(
-        dummy_pools,
-        all_scores,
-        all_items,
-        current_assignments,
-        min_core=2,    # Ensure at least 2 kicks
-        min_accent=2,  # Ensure at least 2 snares
-        min_motion=4,  # Ensure at least 4 hihats
-        max_per_role=best_per_class, # Cap size
-    )
-    
-    # 3. Save Master Kit
-    manifest = {"sr": sr, "roles": {}}
+    # Save all samples to dummy folder
+    dummy_dir = ensure_dir(master_dir / "dummy")
+    manifest = {"sr": sr, "roles": {"dummy": []}}
     total = 0
-    
-    for role, samples in balanced_pool.items():
-        if not samples:
-            continue
-            
-        role_dir = ensure_dir(master_dir / role.value)
-        manifest["roles"][role.value] = []
-        
-        # Sort by energy? Balancer didn't sort them, just grouped.
-        # Let's sort by energy for the user
-        # Recalc rms or use features?
-        samples_with_rms = []
-        for s in samples:
-            rms = np.sqrt(np.mean(s**2))
-            samples_with_rms.append((rms, s))
-        
-        samples_with_rms.sort(key=lambda x: x[0], reverse=True)
-        
-        for i, (rms, sample) in enumerate(samples_with_rms, start=1):
-            sample = normalize_hit(sample)
-            fname = f"{role.value}_{i:03d}.wav"
-            save_audio(role_dir / fname, sample, sr)
-            
-            manifest["roles"][role.value].append({
-                "file": fname,
-                "duration_s": round(len(sample) / sr, 4),
-                "rms": round(float(rms), 6)
-            })
-            total += 1
-            
+
+    # Sort by energy (RMS)
+    samples_with_rms = []
+    for s in all_samples:
+        rms = np.sqrt(np.mean(s**2))
+        samples_with_rms.append((rms, s))
+
+    samples_with_rms.sort(key=lambda x: x[0], reverse=True)
+
+    # Limit to best_per_class if needed
+    if best_per_class > 0:
+        samples_with_rms = samples_with_rms[:best_per_class]
+
+    for i, (rms, sample) in enumerate(samples_with_rms, start=1):
+        sample = normalize_hit(sample)
+        fname = f"dummy_{i:03d}.wav"
+        save_audio(dummy_dir / fname, sample, sr)
+
+        manifest["roles"]["dummy"].append({
+            "file": fname,
+            "duration_s": round(len(sample) / sr, 4),
+            "rms": round(float(rms), 6)
+        })
+        total += 1
+
     manifest["total_samples"] = total
     (master_dir / "kit_manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
-    
+
     logger.info(f"Master kit created: {total} samples in {master_dir}")
     return master_dir
 

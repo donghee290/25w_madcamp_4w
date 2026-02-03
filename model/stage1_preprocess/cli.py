@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from .config import PipelineConfig, SequencerConfig
-from .utils import setup_logging, logger
+from .io.utils import setup_logging, logger
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,6 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
     pipe_p.add_argument("--sr", type=int, default=44100)
     pipe_p.add_argument("--bpm", type=float, default=120.0)
     pipe_p.add_argument("--best-per-class", type=int, default=10)
+    pipe_p.add_argument("--dedup-threshold", type=float, default=0.5,
+                        help="Cosine distance threshold for deduplication")
+    pipe_p.add_argument("--max-hit-duration", type=float, default=2.0,
+                        help="Maximum hit duration in seconds")
+    pipe_p.add_argument("--min-hit-duration", type=float, default=0.0,
+                        help="Minimum hit duration in seconds (0=no filter)")
+    pipe_p.add_argument("--no-dedup", action="store_true",
+                        help="Disable deduplication")
 
     # --- show ---
     show_p = subparsers.add_parser("show", help="Display event grid as ASCII score")
@@ -131,14 +139,14 @@ def main() -> None:
     setup_logging()
 
     if args.command == "scan":
-        from .ingest import generate_report
+        from .io.ingest import generate_report
         config = PipelineConfig()
         root = args.dataset_root or config.dataset_root
         report = generate_report(root, sample_n=args.sample_n)
         print(report.to_json())
 
     elif args.command == "separate":
-        from .separator import extract_drum_stem
+        from .separation.separator import extract_drum_stem
         output_dir = args.output_dir or (args.input.parent / f"{args.input.stem}_drums")
         drums_path = extract_drum_stem(
             args.input, output_dir,
@@ -147,8 +155,8 @@ def main() -> None:
         print(f"Drums extracted: {drums_path}")
 
     elif args.command == "detect":
-        from .detector import detect_onsets
-        from .utils import load_audio
+        from .analysis.detector import detect_onsets
+        from .io.utils import load_audio
         y, _ = load_audio(args.input, sr=args.sr)
         onsets = detect_onsets(y, args.sr, merge_ms=args.merge_ms)
         print(f"Detected {len(onsets)} onsets")
@@ -158,9 +166,9 @@ def main() -> None:
             print(f"  ... and {len(onsets)-20} more")
 
     elif args.command == "classify":
-        from .detector import detect_onsets
-        from .slicer import build_kit_from_audio
-        from .utils import load_audio
+        from .analysis.detector import detect_onsets
+        from .slicing.slicer import build_kit_from_audio
+        from .io.utils import load_audio
         y, _ = load_audio(args.input, sr=args.sr)
         onsets = detect_onsets(y, args.sr)
         output_dir = args.output_dir or (args.input.parent / f"{args.input.stem}_kit")
@@ -184,13 +192,29 @@ def main() -> None:
             print("Kit build failed: no onsets detected")
 
     elif args.command == "sequence":
-        from .test_synth import quick_test
+        from .events import generate_skeleton
+        from .sequencer import load_kit, render_and_save
+
         output_dir = args.output_dir or (args.kit_dir / "test_loops")
-        output = quick_test(
-            args.kit_dir, output_dir,
-            sr=args.sr, bpm=args.bpm, bars=args.bars,
-            pattern_name=args.pattern,
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        pattern_density = {
+            "rock": 4,
+            "hiphop": 6,
+            "jazz": 8,
+        }
+        motion_density = pattern_density.get(args.pattern, 4)
+
+        kit = load_kit(args.kit_dir, sr=args.sr)
+        grid = generate_skeleton(
+            bars=args.bars,
+            bpm=args.bpm,
+            motion_density=motion_density,
+            kit_dir=str(args.kit_dir),
+            seed=42,
         )
+        output = output_dir / f"loop_{args.pattern}_{int(args.bpm)}bpm.wav"
+        render_and_save(grid, kit, output, sr=args.sr, reverb=False)
         print(f"Loop generated: {output}")
 
     elif args.command == "pipeline":
@@ -201,6 +225,10 @@ def main() -> None:
             demucs_device=args.device,
             n_files=args.n_files,
             best_per_class=args.best_per_class,
+            dedup_threshold=args.dedup_threshold,
+            max_hit_duration_s=args.max_hit_duration,
+            min_hit_duration_s=args.min_hit_duration,
+            dedup_enabled=not args.no_dedup,
         )
         if args.dataset_root:
             config.dataset_root = args.dataset_root

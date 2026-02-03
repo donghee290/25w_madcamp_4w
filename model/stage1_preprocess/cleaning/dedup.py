@@ -5,8 +5,8 @@ from typing import List, Tuple
 from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
 import librosa
-from .features import extract_dsp_features
-from .utils import logger
+from ..analysis.features import extract_dsp_features
+from ..io.utils import logger
 
 
 def extract_mfcc_features(y: np.ndarray, sr: int) -> np.ndarray:
