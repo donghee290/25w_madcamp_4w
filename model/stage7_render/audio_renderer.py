@@ -68,8 +68,6 @@ def playback_time(grid_json: Dict[str, Any], ev: Dict[str, Any]) -> float:
         base = bar * tbar + step * tstep
 
     micro_ms = 0.0  # ALWAYS 0.0 per user request
-    # micro_ms = float(ev.get("micro_offset_ms", 0.0) or 0.0)
-    print("[DBG] micro_ms forced to 0.0")
     return base + micro_ms / 1000.0
 
 

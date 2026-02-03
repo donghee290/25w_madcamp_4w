@@ -70,13 +70,18 @@ class PipelineConfig:
     output_root: Path = Path(r"C:\Project\kaist\4_week\drumgenx_output")
 
     # Onset detection
-    onset_merge_ms: float = 30.0
+    # Increased to 100ms to avoid over-segmentation of single hits (e.g. reverb tails, flam)
+    # This ensures slices are longer and more "meaningful".
+    onset_merge_ms: float = 100.0
     onset_backtrack: bool = True
 
     # Slicer
     max_hit_duration_s: float = 2.0
     fade_out_ms: float = 50.0
     trim_silence_db: float = 70.0
+    
+    # One-shot handling
+    one_shot_threshold_s: float = 10.0
 
     # Classifier (deprecated - kept for backward compatibility)
     thresholds: ClassifierThresholds = field(default_factory=ClassifierThresholds)
@@ -95,8 +100,9 @@ class PipelineConfig:
 
     # Deduplication
     dedup_enabled: bool = True
+    dedup_enabled: bool = True
     dedup_threshold: float = 0.5  # cosine distance threshold
-    min_hit_duration_s: float = 0.0  # discard hits shorter than this (0=no filter)
+    min_hit_duration_s: float = 0.1  # discard hits shorter than 100ms
 
     # ML features (disabled by default)
     yamnet_enabled: bool = False
@@ -107,6 +113,9 @@ class PipelineConfig:
 
     # Best samples per class for master kit
     best_per_class: int = 10
+    
+    # Max samples to extract per file (post-dedup)
+    max_extracted_samples: int = 5
 
 
 @dataclass

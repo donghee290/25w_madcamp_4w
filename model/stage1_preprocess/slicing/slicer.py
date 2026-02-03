@@ -106,6 +106,7 @@ def extract_samples(
     min_hit_duration_s: float = 0.0,
     dedup_enabled: bool = True,
     dedup_threshold: float = 0.5,
+    max_extracted_samples: int = None,
 ) -> List[Path]:
     """Full pipeline: slice -> filter -> dedup -> save."""
     hits = slice_hits(y_drums, sr, onsets, max_duration_s, fade_out_ms, trim_db)
@@ -116,6 +117,6 @@ def extract_samples(
     representatives = hits
     # dedup_stats unused in flat output
     if dedup_enabled:
-        representatives, _ = deduplicate_hits(hits, sr, threshold=dedup_threshold)
+        representatives, _ = deduplicate_hits(hits, sr, threshold=dedup_threshold, max_count=max_extracted_samples)
 
     return save_samples(representatives, sr, output_dir, file_stem=file_stem)

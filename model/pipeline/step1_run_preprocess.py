@@ -82,6 +82,76 @@ def process_single_file(
     ensure_dir(temp_work_dir)
 
     try:
+        # Step 0: Check duration for one-shot bypass
+        # Load briefly or use librosa.get_duration if possible. 
+        # Here we just load with librosa to check duration before demucs
+        import librosa
+        duration = librosa.get_duration(path=audio_path)
+        
+        if duration < config.one_shot_threshold_s:
+            logger.info(f"Header duration: {duration:.2f}s. Verifying with robust check...")
+            
+            # Helper to get duration via ffmpeg/ffprobe
+            def get_duration_ffmpeg(path):
+                import subprocess
+                try:
+                    # Use ffprobe to get duration
+                    cmd = [
+                        "ffprobe", "-v", "error", "-show_entries", "format=duration", 
+                        "-of", "default=noprint_wrappers=1:nokey=1", str(path)
+                    ]
+                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if result.returncode == 0 and result.stdout.strip():
+                        return float(result.stdout.strip())
+                except Exception as e:
+                    logger.warning(f"ffprobe failed: {e}")
+                return None
+
+            real_duration = None
+            
+            # Try ffprobe first (most robust for containers)
+            ff_dur = get_duration_ffmpeg(audio_path)
+            if ff_dur is not None:
+                real_duration = ff_dur
+                logger.info(f"ffprobe duration: {real_duration:.2f}s")
+            
+            # Fallback to loading if ffprobe failed
+            if real_duration is None:
+                try:
+                    y, sr = load_audio(audio_path, sr=config.sr)
+                    real_duration = len(y) / sr
+                except Exception as e:
+                    logger.warning(f"Failed to load audio for verification: {e}")
+                    # CRITICAL CHANGE: If we can't verify it's short, assume it's LONG to avoid mis-processing long files as one-shots.
+                    real_duration = 999.0 
+
+            if real_duration < config.one_shot_threshold_s:
+                logger.info(f"Short file confirmed ({real_duration:.2f}s). Treating as one-shot.")
+                
+                # Load if not loaded
+                if 'y' not in locals() or y is None:
+                    y, sr = load_audio(audio_path, sr=config.sr)
+
+                # Simple One-Shot Path: Load -> Trim -> Normalize -> Save
+                
+                # Trim silence
+                trimmed, _ = librosa.effects.trim(y, top_db=config.trim_silence_db)
+                
+                # Normalize
+                from stage1_preprocess.slicing.slicer import normalize_hit
+                norm_y = normalize_hit(trimmed)
+                
+                # Save
+                out_name = f"{audio_path.stem}_001.wav"
+                out_path = samples_dir / out_name
+                
+                save_audio(out_path, norm_y, sr)
+                logger.info(f"Saved one-shot: {out_path}")
+                return 1
+            else:
+                logger.warning(f"File duration judged as {real_duration:.2f}s (header said {duration:.2f}s). LEAVING One-Shot path, proceeding to Demucs pipeline.")
+                # Fall through to Demucs path
+
         # Step 1: Extract drum stem
         logger.info(f"=== Processing: {audio_path.name} ===")
         drums_path = extract_drum_stem(
@@ -130,6 +200,7 @@ def process_single_file(
             min_hit_duration_s=config.min_hit_duration_s,
             dedup_enabled=config.dedup_enabled,
             dedup_threshold=config.dedup_threshold,
+            max_extracted_samples=config.max_extracted_samples,
         )
         
         return len(saved_paths)

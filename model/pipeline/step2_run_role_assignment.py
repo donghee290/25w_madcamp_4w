@@ -34,7 +34,7 @@ from stage2_role_assignment.fusion.guards import GuardsConfig, TextureSuppressCo
 from stage2_role_assignment.pool.build_pools import PoolConfig, build_pools, pools_to_json_dict
 
 
-AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+AUDIO_EXTS = {".wav", ".mp3", ".m4a"}
 
 
 def parse_args() -> argparse.Namespace:

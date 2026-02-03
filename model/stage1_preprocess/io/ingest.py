@@ -11,7 +11,7 @@ import librosa
 from .utils import logger
 
 
-AUDIO_EXTS = {".wav", ".flac", ".mp3", ".m4a", ".ogg", ".aif", ".aiff"}
+AUDIO_EXTS = {".wav", ".mp3", ".m4a"}
 
 
 def scan_dataset(root_dir: Path) -> List[Path]:

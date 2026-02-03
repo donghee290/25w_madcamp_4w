@@ -48,26 +48,14 @@ def build_feature_vector(y: np.ndarray, sr: int) -> np.ndarray:
         dsp_dict['decay_time']
     ])
 
-    # Normalize each part separately (z-score normalization with epsilon)
-    eps = 1e-8
-
-    # Normalize MFCC
-    mfcc_mean = np.mean(mfcc_features)
-    mfcc_std = np.std(mfcc_features) + eps
-    mfcc_normalized = (mfcc_features - mfcc_mean) / mfcc_std
-
-    # Normalize DSP
-    dsp_mean = np.mean(dsp_features)
-    dsp_std = np.std(dsp_features) + eps
-    dsp_normalized = (dsp_features - dsp_mean) / dsp_std
-
-    # Concatenate into 20-dim vector
-    feature_vector = np.concatenate([mfcc_normalized, dsp_normalized])
+    # Concatenate into 20-dim vector (Raw values)
+    # Normalization should be done across the dataset/batch, not per-sample features.
+    feature_vector = np.concatenate([mfcc_features, dsp_features])
 
     return feature_vector
 
 
-def deduplicate_hits(hits: List[np.ndarray], sr: int, threshold: float = 0.5) -> Tuple[List[np.ndarray], dict]:
+def deduplicate_hits(hits: List[np.ndarray], sr: int, threshold: float = 0.5, max_count: int = None) -> Tuple[List[np.ndarray], dict]:
     """Deduplicate drum hits using MFCC+DSP clustering.
 
     Args:
@@ -107,6 +95,21 @@ def deduplicate_hits(hits: List[np.ndarray], sr: int, threshold: float = 0.5) ->
 
     feature_matrix = np.array(feature_matrix)
 
+    # Normalize features across the batch (StandardScaler style)
+    # Each feature dimension should have mean=0, std=1 across all hits.
+    # tailored for distance metric stability.
+    
+    # Avoid div by zero
+    eps = 1e-8
+    mean = np.mean(feature_matrix, axis=0)
+    std = np.std(feature_matrix, axis=0) + eps
+    
+    feature_matrix = (feature_matrix - mean) / std
+    
+    # Optional: Weight MFCC vs DSP? 
+    # Currently treating all 20 dims equally.
+
+
     # Check if all features are identical (edge case)
     if np.allclose(feature_matrix, feature_matrix[0], rtol=1e-5, atol=1e-8):
         logger.warning("All feature vectors are identical, returning first hit only")
@@ -143,8 +146,20 @@ def deduplicate_hits(hits: List[np.ndarray], sr: int, threshold: float = 0.5) ->
         ]
 
         best_idx = np.argmax(scores)
-        representative_hits.append(cluster_hits[best_idx])
+        representative_hits.append((len(cluster_hits), cluster_hits[best_idx])) # Store (size, hit)
         cluster_sizes.append(len(cluster_hits))
+
+    # Sort by cluster size (descending) to keep most frequent/meaningful sounds
+    representative_hits.sort(key=lambda x: x[0], reverse=True)
+    
+    # Unwrap hits
+    sorted_hits = [x[1] for x in representative_hits]
+    
+    if max_count is not None and len(sorted_hits) > max_count:
+        sorted_hits = sorted_hits[:max_count]
+        logger.info(f"Limited output to top {max_count} samples (from {len(representative_hits)} clusters)")
+
+    representative_hits = sorted_hits
 
     logger.info(f"Selected {len(representative_hits)} representative samples")
 
