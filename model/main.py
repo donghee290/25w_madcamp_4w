@@ -41,6 +41,7 @@ def main():
     p.add_argument("--project_name", type=str, default="project_001")
     p.add_argument("--bpm", type=float, default=120.0)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--style", type=str, default="rock", help="rock (kung-chi-ta-chi) or house")
     args = p.parse_args()
     
     start_time = time.time()
@@ -90,6 +91,7 @@ def main():
         "--out_dir", str(dirs["s3"]),
         "--bpm", str(args.bpm),
         "--seed", str(args.seed),
+        "--style", str(args.style), # Pass style
         "--sample_root", str(dirs["s1"]) # Render needs samples
     ])
     

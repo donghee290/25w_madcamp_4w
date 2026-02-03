@@ -13,6 +13,9 @@ class SkeletonConfig:
     seed: int = 42
     steps_per_bar: int = 16
     num_bars: int = 4
+    
+    # Pattern Style
+    pattern_style: str = "rock"     # "rock" (Kung-Chi-Ta-Chi) or "house" (Four-on-the-Floor)
 
     # MOTION 밀도
     motion_mode: str = "A"          # A or B
@@ -79,11 +82,9 @@ def _apply_max_poly(events: List[Event], max_poly: int) -> List[Event]:
 def build_skeleton_events(
     pools_json: Dict[str, List[dict]],
     cfg: SkeletonConfig,
-    tstep: float = 0.125,  # Add tstep argument for dur calculation
+    tstep: float = 0.125,
 ) -> Tuple[List[Event], Dict[str, str]]:
-    """
-    pools_json: role_assignment 결과 pools json
-    """
+    """Build skeleton events based on pattern style."""
     rng = random.Random(cfg.seed)
 
     core_pool = pools_json.get("CORE_POOL", []) or []
@@ -107,25 +108,37 @@ def build_skeleton_events(
         chosen["FILL"] = str(fill_sample.get("sample_id"))
     if texture_sample:
         chosen["TEXTURE"] = str(texture_sample.get("sample_id"))
-
-    # MOTION은 2~4개 후보
+    
     motion_candidates = _pick_many(rng, motion_pool, k=4)
     if motion_candidates:
         chosen["MOTION"] = ",".join([str(x.get("sample_id")) for x in motion_candidates])
 
     events: List[Event] = []
+    from stage3_beat_grid.events import dur_from_decay
 
-    from stage3_beat_grid.events import dur_from_decay  # Lazy import to avoid circular if any
+    # Define patterns based on style
+    # 16-step grid assumptions:
+    # 0=1.1, 4=1.2, 8=1.3, 12=1.4
+    
+    if cfg.pattern_style == "house":
+        core_steps = (0, 4, 8, 12)  # Four on the floor
+        accent_steps = (4, 12)      # Backbeat on 2 and 4
+    elif cfg.pattern_style == "hiphop":
+        core_steps = (0, 10)        # Kick on 1 and 3-and (classic boom-bap / breakbeatish)
+        accent_steps = (4, 12)      # Snare on 2 and 4
+    else: 
+        # "rock" / standard (Kung-Chi-Ta-Chi)
+        core_steps = (0, 8)         # Kick on 1 and 3
+        accent_steps = (4, 12)      # Snare on 2 and 4
 
-    # ---- CORE skeleton: 0,4,8,12
+    # ---- CORE skeleton
     if core_sample:
-        steps = (0, 4, 8, 12)
         feats = core_sample.get("features", {})
         decay = feats.get("decay_time", None)
         dur = dur_from_decay(decay, tstep, "CORE")
         
         for b in range(cfg.num_bars):
-            for s in steps:
+            for s in core_steps:
                 e = feats.get("energy", None)
                 events.append(
                     Event(
@@ -138,15 +151,14 @@ def build_skeleton_events(
                     )
                 )
 
-    # ---- ACCENT skeleton: 4,12
+    # ---- ACCENT skeleton
     if accent_sample:
-        steps = (4, 12)
         feats = accent_sample.get("features", {})
         decay = feats.get("decay_time", None)
         dur = dur_from_decay(decay, tstep, "ACCENT")
 
         for b in range(cfg.num_bars):
-            for s in steps:
+            for s in accent_steps:
                 e = feats.get("energy", None)
                 events.append(
                     Event(

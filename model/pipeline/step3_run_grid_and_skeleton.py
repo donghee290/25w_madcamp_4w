@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--motion_keep", type=int, default=6)          # 4~8
     p.add_argument("--fill_prob", type=float, default=0.25)
     p.add_argument("--texture", type=int, default=1)              # 1/0
+    p.add_argument("--style", type=str, default="rock")           # rock/house/hiphop
 
     # render 관련 (필요하면 바꿔서 쓰세요)
     p.add_argument("--sample_root", type=str, default="examples/input_samples")
@@ -204,6 +205,7 @@ def main() -> None:
         motion_keep_per_bar=int(args.motion_keep),
         fill_prob=float(args.fill_prob),
         texture_enabled=bool(int(args.texture)),
+        pattern_style=str(args.style),
     )
 
     events, chosen = build_skeleton_events(
