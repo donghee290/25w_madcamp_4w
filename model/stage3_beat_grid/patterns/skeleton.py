@@ -133,15 +133,26 @@ def build_skeleton_events(
 
     # 16-step grid assumptions:
     # 0=1.1, 4=1.2, 8=1.3, 12=1.4
-    if cfg.pattern_style == "house":
-        core_steps = (0, 4, 8, 12)
-        accent_steps = (4, 12)
-    elif cfg.pattern_style == "hiphop":
-        core_steps = (0, 10)
-        accent_steps = (4, 12)
-    else:
-        core_steps = (0, 8)
-        accent_steps = (4, 12)
+    
+    # Define Styles (Core Steps, Accent Steps)
+    # This could be moved to config or outside function, but fine here for now.
+    STYLES = {
+        "rock":   ((0, 8), (4, 12)),
+        "house":  ((0, 4, 8, 12), (4, 12)),
+        "techno": ((0, 4, 8, 12), (4, 12)),
+        "hiphop": ((0, 10), (4, 12)),
+        "trap":   ((0, 10), (4, 12)), # Similar to hiphop but often slower feel
+        "funk":   ((0, 7, 10), (4, 12)), # Syncopated
+        "rnb":    ((0, 3, 8), (4, 12)), # Smoother kick placement
+        "dnb":    ((0, 10), (4, 12)), # Fast breakbeat feel (needs high BPM)
+    }
+    
+    style_key = cfg.pattern_style.lower()
+    if style_key not in STYLES:
+        # Fallback to rock if unknown
+        style_key = "rock"
+        
+    core_steps, accent_steps = STYLES[style_key]
 
     # ---- CORE
     if core_sample:
