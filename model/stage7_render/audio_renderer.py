@@ -1,10 +1,9 @@
-# audio_render/render.py
+# stage7_render/audio_renderer.py
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List
-
+from typing import Dict, List, Optional
 import numpy as np
 import soundfile as sf
 import librosa
@@ -50,12 +49,16 @@ def render_events(
     mix = np.zeros(total_samples, dtype=np.float32)
 
     for ev in events:
-        role = ev["role"]
-        sample_id = ev["sample_id"]
-        step = int(ev["step"])
-        bar = int(ev["bar"])
-        vel = float(ev["vel"])
-        dur_steps = int(ev["dur_steps"])
+        role = ev.get("role", "unknown")
+        sample_id = ev.get("sample_id")
+        step = int(ev.get("step", 0))
+        bar = int(ev.get("bar", 0))
+        vel = float(ev.get("vel", 1.0))
+        # velocity key variation
+        if "velocity" in ev:
+            vel = float(ev["velocity"]) / 127.0
+        
+        dur_steps = int(ev.get("dur_steps", 1))
         micro_ms = float(ev.get("micro_offset_ms", 0.0))
 
         # 원샷 파일 경로
@@ -63,22 +66,25 @@ def render_events(
         # filepath를 event에 넣었으면 그걸 쓰는 게 제일 정확
         # MVP: sample_id로 wav 찾기
         wav_path = None
-        for ext in (".wav", ".mp3", ".flac", ".ogg", ".m4a"):
-            p = sample_root / f"{sample_id}{ext}"
+        
+        # 1. filepath 필드 확인
+        path_str = ev.get("filepath", "") or ""
+        if path_str.strip():
+            p = Path(path_str)
             if p.exists():
                 wav_path = p
-                break
-        if wav_path is None:
-            # filepath 직접 들어있는 경우
-            # filepath 직접 들어있는 경우
-            path_str = ev.get("filepath", "") or ""
-            if path_str.strip():
-                p = Path(path_str)
+        
+        # 2. sample_id로 sample_root에서 탐색
+        if wav_path is None and sample_id:
+            for ext in (".wav", ".mp3", ".flac", ".ogg", ".m4a"):
+                p = sample_root / f"{sample_id}{ext}"
                 if p.exists():
                     wav_path = p
-            else:
-                print(f"[WARN] sample not found: {sample_id}")
-                continue
+                    break
+        
+        if wav_path is None:
+            # print(f"[WARN] sample not found: {sample_id}")
+            continue
 
         y = load_wav_mono(wav_path, target_sr)
 
@@ -111,30 +117,3 @@ def render_events(
 
     sf.write(out_wav, mix, target_sr)
     print(f"[OK] rendered: {out_wav}")
-
-
-def main():
-    import argparse
-
-    p = argparse.ArgumentParser()
-    p.add_argument("--grid", required=True)
-    p.add_argument("--events", required=True)
-    p.add_argument("--samples", required=True)
-    p.add_argument("--out", required=True)
-    p.add_argument("--sr", type=int, default=44100)
-    args = p.parse_args()
-
-    grid_json = json.loads(Path(args.grid).read_text())
-    events = json.loads(Path(args.events).read_text())
-
-    render_events(
-        grid_json=grid_json,
-        events=events,
-        sample_root=Path(args.samples),
-        out_wav=Path(args.out),
-        target_sr=int(args.sr),
-    )
-
-
-if __name__ == "__main__":
-    main()

@@ -1,20 +1,21 @@
-
 import subprocess
 import argparse
 import sys
 import os
+import time
 from pathlib import Path
 
 # Setup paths
-BASE_DIR = Path(__file__).parent.parent.resolve() # /home/dh/soundroutine/model
-PIPELINE_DIR = BASE_DIR / "pipeline"
+MODEL_DIR = Path(__file__).parent.resolve() # /home/dh/soundroutine/model
+PROJECT_ROOT = MODEL_DIR.parent.resolve() # /home/dh/soundroutine
+PIPELINE_DIR = MODEL_DIR / "pipeline"
 
 def run_step(step_name, cmd_args):
     print(f"\n[pipeline] Running {step_name} ...")
     cmd = [sys.executable, str(PIPELINE_DIR / step_name)] + cmd_args
     print(f"[cmd] {' '.join(cmd)}")
     try:
-        subprocess.check_call(cmd, cwd=BASE_DIR)
+        subprocess.check_call(cmd, cwd=PROJECT_ROOT)
         print(f"[pipeline] {step_name} Success.\n")
     except subprocess.CalledProcessError as e:
         print(f"[pipeline] {step_name} Failed!")
@@ -28,8 +29,10 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     args = p.parse_args()
     
+    start_time = time.time()
+    
     # 0. Output Setup
-    output_root = BASE_DIR / "outs" / args.project_name
+    output_root = PROJECT_ROOT / "outs" / args.project_name
     output_root.mkdir(parents=True, exist_ok=True)
     
     dirs = {
@@ -118,6 +121,9 @@ def main():
     
     print("\n[pipeline] ALL DONE!")
     print(f"Final Output: {dirs['s7']}/{args.project_name}_final.mp3")
+    
+    elapsed = time.time() - start_time
+    print(f"[pipeline] Total execution time: {elapsed:.2f} seconds")
 
 if __name__ == "__main__":
     main()
