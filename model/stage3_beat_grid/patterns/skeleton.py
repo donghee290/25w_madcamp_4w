@@ -15,11 +15,13 @@ class SkeletonConfig:
     num_bars: int = 4
     
     # Pattern Style
-    pattern_style: str = "rock"     # "rock" (Kung-Chi-Ta-Chi) or "house" (Four-on-the-Floor)
+    pattern_style: str = "rock"
 
     # MOTION 밀도
     motion_mode: str = "A"          # A or B
     motion_keep_per_bar: int = 6    # 4~8 권장
+
+    motion_repeat_across_bars: bool = True
 
     # FILL
     fill_every_n_bars: int = 4       # 매 4bar마다 마지막 bar
@@ -30,9 +32,6 @@ class SkeletonConfig:
     # TEXTURE
     texture_enabled: bool = True
     texture_dur_steps: int = 16
-
-    # 동시타격 제한
-    max_poly: int = 3
 
 
 def _pick_one(rng: random.Random, pool: List[dict]) -> Optional[dict]:
@@ -51,32 +50,6 @@ def _pick_many(rng: random.Random, pool: List[dict], k: int) -> List[dict]:
 
 def _event_key(e: Event) -> Tuple[int, int]:
     return (e.bar, e.step)
-
-
-def _apply_max_poly(events: List[Event], max_poly: int) -> List[Event]:
-    """
-    같은 (bar, step)에 이벤트가 max_poly 초과면 삭제.
-    삭제 우선순위: TEXTURE > MOTION > ACCENT > CORE (FILL은 ACCENT와 비슷하게 취급)
-    """
-    if max_poly <= 0:
-        return events
-
-    prio = {"CORE": 0, "ACCENT": 1, "FILL": 1, "MOTION": 2, "TEXTURE": 3}
-
-    buckets: Dict[Tuple[int, int], List[Event]] = {}
-    for e in events:
-        buckets.setdefault(_event_key(e), []).append(e)
-
-    out: List[Event] = []
-    for k, lst in buckets.items():
-        if len(lst) <= max_poly:
-            out.extend(lst)
-            continue
-        lst_sorted = sorted(lst, key=lambda x: prio.get(x.role, 9))
-        out.extend(lst_sorted[:max_poly])
-
-    out.sort(key=lambda e: (e.bar, e.step, e.role))
-    return out
 
 
 def build_skeleton_events(
@@ -172,28 +145,34 @@ def build_skeleton_events(
                 )
 
     # ---- MOTION skeleton
-    motion_steps_A = (2, 6, 10, 14)
+    motion_steps_A = tuple(range(0, cfg.steps_per_bar))
     motion_steps_B = (1, 3, 5, 7, 9, 11, 13, 15)
     base_steps = motion_steps_A if cfg.motion_mode.upper() == "A" else motion_steps_B
 
+    fixed_picked_steps = None
+    if cfg.motion_repeat_across_bars:
+        keep = min(cfg.motion_keep_per_bar, len(base_steps))
+        fixed_picked_steps = sorted(rng.sample(list(base_steps), k=keep))
+
     if motion_candidates:
         for b in range(cfg.num_bars):
-            # bar당 motion 후보 steps 중 keep개만 고정 seed로 선택
-            keep = min(cfg.motion_keep_per_bar, len(base_steps))
-            picked_steps = rng.sample(list(base_steps), k=keep)
+            if fixed_picked_steps is not None:
+                picked_steps = fixed_picked_steps
+            else:
+                keep = min(cfg.motion_keep_per_bar, len(base_steps))
+                picked_steps = sorted(rng.sample(list(base_steps), k=keep))
 
-            # step마다 sample을 round-robin
-            for i, s in enumerate(sorted(picked_steps)):
+            for i, s in enumerate(picked_steps):
                 samp = motion_candidates[i % len(motion_candidates)]
                 feats = samp.get("features", {})
                 decay = feats.get("decay_time", None)
                 dur = dur_from_decay(decay, tstep, "MOTION")
                 e = feats.get("energy", None)
-                
+
                 events.append(
                     Event(
                         bar=b,
-                        step=s,
+                        step=int(s) % cfg.steps_per_bar,  # 방어
                         role="MOTION",
                         sample_id=str(samp["sample_id"]),
                         vel=vel_from_energy("MOTION", e, rng),
@@ -250,6 +229,5 @@ def build_skeleton_events(
                 )
             )
 
-    # 동시타격 제한
-    events = _apply_max_poly(events, cfg.max_poly)
+    events.sort(key=lambda e: (e.bar, e.step, e.role))
     return events, chosen

@@ -38,10 +38,40 @@ def build_pools(
     if cfg.promote_when_missing_enabled:
         _promote_missing_required(pools, results, cfg)
 
+    # [User Request] Ensure CORE/ACCENT/MOTION have only 1 best item
+    # Others are moved to FILL or TEXTURE
+    _keep_single_best_strict(pools, [Role.CORE, Role.ACCENT, Role.MOTION])
+
     if cfg.rebalance_when_excess_enabled:
         _rebalance_excess(pools, cfg)
 
     return pools
+
+
+def _keep_single_best_strict(pools: RolePools, targets: List[Role]) -> None:
+    for role in targets:
+        items = pools.get(role)
+        if len(items) <= 1:
+            continue
+
+        # Sort by score for this role (descending)
+        items.sort(key=lambda x: float(x.scores.final.values.get(role, 0.0)), reverse=True)
+
+        best = items[0]
+        others = items[1:]
+
+        # Keep only the best in the current pool
+        # (Modify list in-place)
+        items[:] = [best]
+
+        # Move others to FILL or TEXTURE
+        for item in others:
+            p_fill = float(item.scores.final.values.get(Role.FILL, 0.0))
+            p_tex = float(item.scores.final.values.get(Role.TEXTURE, 0.0))
+
+            new_role = Role.FILL if p_fill >= p_tex else Role.TEXTURE
+            item.role = new_role
+            pools.get(new_role).append(item)
 
 
 def pools_to_json_dict(pools: RolePools) -> Dict:
