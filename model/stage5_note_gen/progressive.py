@@ -9,13 +9,18 @@ from .grid_io import build_repeated_grid
 
 @dataclass
 class ProgressiveConfig:
-    segment_bars: int = 4
-    layers: Tuple[str, ...] = ("CORE", "ACCENT", "MOTION", "FILL")  # TEXTURE는 보통 별도
-    final_repeat: int = 2  # 마지막 Full 단계를 몇 번 더 반복할지
+    # 무조건 8bars마다 레이어가 하나씩 추가됨
+    segment_bars: int = 8
+
+    # 고정 레이어 순서 (요구사항)
+    layers: Tuple[str, ...] = ("CORE", "ACCENT", "MOTION", "FILL", "TEXTURE")
+
+    # 마지막 "풀 레이어" 반복 (원하면 0으로)
+    final_repeat: int = 0
 
 
 def filter_by_roles(events: List[Event], allowed: set[str]) -> List[Event]:
-    return [e for e in events if e.role.upper() in allowed]
+    return [e for e in events if str(e.role).upper() in allowed]
 
 
 def shift_bars(events: List[Event], bar_offset: int) -> List[Event]:
@@ -23,18 +28,71 @@ def shift_bars(events: List[Event], bar_offset: int) -> List[Event]:
     for e in events:
         out.append(
             Event(
-                bar=e.bar + bar_offset,
-                step=e.step,
+                bar=int(e.bar) + int(bar_offset),
+                step=int(e.step),
                 role=e.role,
                 sample_id=e.sample_id,
-                filepath=e.filepath, # Add filepath
+                filepath=getattr(e, "filepath", None),
                 vel=e.vel,
                 dur_steps=e.dur_steps,
-                micro_offset_ms=e.micro_offset_ms,
-                source=e.source,
-                extra=e.extra,
+                micro_offset_ms=getattr(e, "micro_offset_ms", 0.0),
+                source=getattr(e, "source", "progressive"),
+                extra=getattr(e, "extra", None),
             )
         )
+    return out
+
+
+def _has_any_role(events: List[Event], role: str) -> bool:
+    ru = role.upper()
+    for e in events:
+        if str(e.role).upper() == ru:
+            return True
+    return False
+
+
+def _fit_to_segment(events: List[Event], seg: int) -> List[Event]:
+    """
+    base_events는 보통 base_grid.num_bars 길이(예: 4bar)로 들어오는데,
+    segment_bars=8로 늘리려면 "패턴을 반복"해서 seg 길이로 맞춘다.
+    """
+    if seg <= 0:
+        return []
+
+    # base 길이 추정: events 중 최대 bar 기준으로 계산
+    max_bar = 0
+    for e in events:
+        if int(e.bar) > max_bar:
+            max_bar = int(e.bar)
+    base_len = max_bar + 1  # bar index는 0-based
+    if base_len <= 0:
+        base_len = 1
+
+    if base_len == seg:
+        return [e for e in events if 0 <= int(e.bar) < seg]
+
+    # base_len < seg 인 경우: 반복해서 seg까지 채움
+    out: List[Event] = []
+    repeat = (seg + base_len - 1) // base_len  # ceil
+    for r in range(repeat):
+        offset = r * base_len
+        for e in events:
+            nb = int(e.bar) + offset
+            if 0 <= nb < seg:
+                out.append(
+                    Event(
+                        bar=nb,
+                        step=int(e.step),
+                        role=e.role,
+                        sample_id=e.sample_id,
+                        filepath=getattr(e, "filepath", None),
+                        vel=e.vel,
+                        dur_steps=e.dur_steps,
+                        micro_offset_ms=getattr(e, "micro_offset_ms", 0.0),
+                        source=getattr(e, "source", "progressive"),
+                        extra=getattr(e, "extra", None),
+                    )
+                )
     return out
 
 
@@ -43,59 +101,95 @@ def build_progressive_timeline(
     base_events: List[Event],
     cfg: ProgressiveConfig,
 ) -> Tuple[Grid, List[Event], Dict[str, Any]]:
-    # base_grid.num_bars는 보통 4로 들어옴
+    """
+    요구사항:
+    - 무조건 core > accent > motion > fill > texture 순
+    - 8bars마다 하나씩 쌓음
+    - core/accent/motion은 필수
+    - fill/texture는 없으면 '그 레이어 단계 자체'를 스킵
+      (즉, CORE+ACCENT+MOTION까지만 진행하고 끝)
+    """
     seg = int(cfg.segment_bars)
+
+    # 필수 3개 존재 체크: 하나라도 없으면 progressive 자체를 만들지 않고 원본 반환
+    required = ("CORE", "ACCENT", "MOTION")
+    if not all(_has_any_role(base_events, r) for r in required):
+        meta = {
+            "segment_bars": seg,
+            "layers": list(cfg.layers),
+            "segments": [],
+            "skipped": True,
+            "reason": "missing required roles (need CORE/ACCENT/MOTION)",
+        }
+        return base_grid, base_events, meta
+
+    # optional layer 존재 여부에 따라 실제 빌드업 단계 결정
+    fill_exists = _has_any_role(base_events, "FILL")
+    texture_exists = _has_any_role(base_events, "TEXTURE")
+
+    # 진행 순서는 고정이지만, 존재하지 않으면 단계 자체를 건너뜀
+    effective_layers: List[str] = ["CORE", "ACCENT", "MOTION"]
+    if fill_exists:
+        effective_layers.append("FILL")
+    if texture_exists:
+        effective_layers.append("TEXTURE")
 
     # 누적 허용 role set을 단계별로 확장
     allowed: set[str] = set()
     staged_events: List[Event] = []
-    meta_layers: List[Dict[str, Any]] = []
+    meta_segments: List[Dict[str, Any]] = []
 
-    for i, role in enumerate(cfg.layers):
+    # seg 길이로 맞춘 "세그먼트용 루프 이벤트"를 단계별로 만들기 위해,
+    # base_events에서 필요한 role만 뽑고, seg bars로 늘려둔다.
+    for i, role in enumerate(effective_layers):
         allowed.add(role.upper())
-        # base_events에서 필요한 role만 뽑기
+
         layer_events = filter_by_roles(base_events, allowed)
+        layer_events = _fit_to_segment(layer_events, seg)  # 핵심: 8bar segment에 맞게 반복/자르기
 
-        # segment에 맞추기: base_events는 bar 0..base_grid.num_bars-1 이므로,
-        # seg bars 단위를 넘기려면 bar 범위를 잘라야 함
-        # MVP: base_grid.num_bars == seg 가정(기본 4)
-        layer_events = [e for e in layer_events if 0 <= e.bar < seg]
-
-        # i번째 segment로 bar shift
         bar_offset = i * seg
         staged_events.extend(shift_bars(layer_events, bar_offset))
 
-        meta_layers.append(
+        meta_segments.append(
             {
                 "segment_index": i,
                 "bar_offset": bar_offset,
                 "allowed_roles": sorted(list(allowed)),
                 "num_events": len(layer_events),
-                "type": "buildup"
+                "type": "buildup",
             }
         )
 
-    # Final repeat (Full intensity)
-    # 마지막 레이어 상태(allowed가 전부 포함된 상태)를 그대로 유지하며 뒤에 붙임
-    final_layer_events = filter_by_roles(base_events, allowed)
-    final_layer_events = [e for e in final_layer_events if 0 <= e.bar < seg] # base loop
+    # 마지막 "풀 레이어" 반복 (원하면)
+    current_seg_idx = len(effective_layers)
+    if cfg.final_repeat > 0:
+        final_events = filter_by_roles(base_events, allowed)
+        final_events = _fit_to_segment(final_events, seg)
 
-    current_seg_idx = len(cfg.layers)
-    for r in range(cfg.final_repeat):
-        bar_offset = current_seg_idx * seg
-        staged_events.extend(shift_bars(final_layer_events, bar_offset))
-        
-        meta_layers.append({
-            "segment_index": current_seg_idx,
-            "bar_offset": bar_offset,
-            "allowed_roles": sorted(list(allowed)),
-            "num_events": len(final_layer_events),
-            "type": "repeat_full"
-        })
-        current_seg_idx += 1
+        for r in range(int(cfg.final_repeat)):
+            bar_offset = (current_seg_idx + r) * seg
+            staged_events.extend(shift_bars(final_events, bar_offset))
+            meta_segments.append(
+                {
+                    "segment_index": current_seg_idx + r,
+                    "bar_offset": bar_offset,
+                    "allowed_roles": sorted(list(allowed)),
+                    "num_events": len(final_events),
+                    "type": "repeat_full",
+                }
+            )
+        current_seg_idx += int(cfg.final_repeat)
 
     total_bars = seg * current_seg_idx
     new_grid = build_repeated_grid(base_grid, repeat_bars=total_bars)
-    staged_events.sort(key=lambda e: (e.bar, e.step))
-    meta = {"segment_bars": seg, "layers": list(cfg.layers), "segments": meta_layers}
+
+    staged_events.sort(key=lambda e: (int(e.bar), int(e.step), str(e.role)))
+    meta = {
+        "segment_bars": seg,
+        "layers_requested": list(cfg.layers),
+        "layers_effective": effective_layers,
+        "segments": meta_segments,
+        "skipped": False,
+        "notes": "segments are 8 bars; base pattern is repeated/truncated to fit each segment",
+    }
     return new_grid, staged_events, meta

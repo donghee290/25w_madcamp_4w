@@ -10,6 +10,9 @@ import numpy as np
 import soundfile as sf
 
 
+AUDIO_EXTS = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
+
+
 def load_wav_mono(path: Path, target_sr: int) -> np.ndarray:
     y, _sr = librosa.load(path, sr=target_sr, mono=True)
     return y.astype(np.float32, copy=False)
@@ -32,58 +35,80 @@ def _clamp(v: float, lo: float, hi: float) -> float:
     return lo if v < lo else hi if v > hi else v
 
 
-def _safe_bar_step(grid_json: Dict[str, Any], bar: int, step: int) -> tuple[int, int]:
+def _ensure_t_step_extended(grid_json: Dict[str, Any], num_bars: int) -> None:
     """
-    grid_json["t_step"][bar][step] 접근이 항상 안전하도록 bar/step을 보정합니다.
+    events의 bar 범위를 커버하도록 grid_json["t_step"]를 num_bars까지 확장합니다.
+    - 기존 row는 유지하고, 부족한 bar row만 추가합니다.
     """
+    if num_bars <= 0:
+        return
+
+    tbar = float(grid_json.get("tbar", 0.0) or 0.0)
+    tstep = float(grid_json.get("tstep", 0.0) or 0.0)
+    steps_per_bar = int(grid_json.get("steps_per_bar", 16) or 16)
+
+    if tbar <= 0 or tstep <= 0 or steps_per_bar <= 0:
+        return
+
     t_step = grid_json.get("t_step", None)
-    if not isinstance(t_step, list) or not t_step:
-        # t_step이 없으면 최소한 bar/step 음수만 방지
-        return max(0, bar), max(0, step)
+    if not isinstance(t_step, list):
+        t_step = []
+        grid_json["t_step"] = t_step
 
-    bar = max(0, min(int(bar), len(t_step) - 1))
-    row = t_step[bar]
-    if not isinstance(row, list) or not row:
-        return bar, 0
+    cur = len(t_step)
+    if cur >= num_bars:
+        return
 
-    step = int(step) % len(row)
-    return bar, step
+    for b in range(cur, num_bars):
+        base = b * tbar
+        row = [base + k * tstep for k in range(steps_per_bar)]
+        t_step.append(row)
 
 
 def playback_time(grid_json: Dict[str, Any], ev: Dict[str, Any]) -> float:
     """
-    재생 시간(sec): grid 스텝 기준 시간 + micro_offset_ms
-    - grid_json["t_step"]를 최우선으로 사용
-    - bar/step 인덱스 방어 포함
+    재생 시간(sec): grid 스텝 기준 시간 (+ micro_offset_ms)
+    IMPORTANT:
+    - progressive처럼 bar가 길게 늘어난 경우에도 bar를 clamp 하지 않습니다.
+    - t_step 범위 밖이면 공식(bar*tbar + step*tstep)으로 계산합니다.
+    - micro_offset은 현재 0으로 고정(동바님 요청).
     """
-    bar, step = _safe_bar_step(grid_json, int(ev.get("bar", 0)), int(ev.get("step", 0)))
+    bar = int(ev.get("bar", 0) or 0)
+    step = int(ev.get("step", 0) or 0)
+
+    tbar = float(grid_json.get("tbar", 0.0) or 0.0)
+    tstep = float(grid_json.get("tstep", 0.0) or 0.0)
 
     t_step = grid_json.get("t_step", None)
-    if isinstance(t_step, list) and t_step and isinstance(t_step[bar], list) and t_step[bar]:
-        base = float(t_step[bar][step])
+    if isinstance(t_step, list) and 0 <= bar < len(t_step) and isinstance(t_step[bar], list) and t_step[bar]:
+        row = t_step[bar]
+        step = step % len(row)
+        base = float(row[step])
     else:
-        # fallback: t_step이 없을 때만 사용하는 단순 계산
-        tbar = float(grid_json.get("tbar", 0.0) or 0.0)
-        tstep = float(grid_json.get("tstep", 0.0) or 0.0)
         base = bar * tbar + step * tstep
 
-    micro_ms = 0.0  # ALWAYS 0.0 per user request
+    micro_ms = 0.0
     return base + micro_ms / 1000.0
 
 
 def ui_snap_info(grid_json: Dict[str, Any], ev: Dict[str, Any]) -> Dict[str, Any]:
     """
-    UI 표시에 사용할 스냅 정보.
-    out-of-range를 방지하기 위해 bar/step을 안전 보정합니다.
+    UI 표시용 스냅 정보.
+    - t_step이 있으면 그 기준
+    - 없거나 범위 밖이면 공식 계산
     """
-    bar, step = _safe_bar_step(grid_json, int(ev.get("bar", 0)), int(ev.get("step", 0)))
-    t_step = grid_json.get("t_step", None)
+    bar = int(ev.get("bar", 0) or 0)
+    step = int(ev.get("step", 0) or 0)
 
-    if isinstance(t_step, list) and t_step and isinstance(t_step[bar], list) and t_step[bar]:
-        snapped = float(t_step[bar][step])
+    tbar = float(grid_json.get("tbar", 0.0) or 0.0)
+    tstep = float(grid_json.get("tstep", 0.0) or 0.0)
+
+    t_step = grid_json.get("t_step", None)
+    if isinstance(t_step, list) and 0 <= bar < len(t_step) and isinstance(t_step[bar], list) and t_step[bar]:
+        row = t_step[bar]
+        step = step % len(row)
+        snapped = float(row[step])
     else:
-        tbar = float(grid_json.get("tbar", 0.0) or 0.0)
-        tstep = float(grid_json.get("tstep", 0.0) or 0.0)
         snapped = bar * tbar + step * tstep
 
     return {"ui_bar": bar, "ui_step": step, "ui_time_sec": snapped}
@@ -95,12 +120,10 @@ def _resolve_sample_path(
     sample_id: Optional[str],
 ) -> Optional[Path]:
     """
-    이벤트에서 실제 원샷 파일을 찾습니다.
+    이벤트에서 실제 파일을 찾습니다.
     1) ev["filepath"]가 존재하고 실제 파일이면 사용
     2) sample_root / f"{sample_id}{ext}" 탐색
     """
-    wav_path: Optional[Path] = None
-
     # 1) filepath 필드 우선
     path_str = (ev.get("filepath", "") or "").strip()
     if path_str:
@@ -110,13 +133,12 @@ def _resolve_sample_path(
 
     # 2) sample_id 기반 탐색
     if sample_id:
-        for ext in (".wav", ".mp3", ".flac", ".ogg", ".m4a"):
+        for ext in AUDIO_EXTS:
             p = sample_root / f"{sample_id}{ext}"
             if p.exists():
-                wav_path = p
-                break
+                return p
 
-    return wav_path
+    return None
 
 
 def render_events(
@@ -127,7 +149,6 @@ def render_events(
     target_sr: int = 44100,
     master_gain: float = 0.9,
     fade_ms: float = 5.0,
-    clamp_micro_to_half_step: bool = True,
 ) -> None:
     """
     sample_root: 원샷 wav들이 있는 디렉토리 (filepath 기준 상대/절대 모두 처리)
@@ -141,40 +162,42 @@ def render_events(
     if num_bars <= 0 or tbar <= 0:
         raise ValueError("grid_json must contain valid num_bars and tbar")
 
-    # Check consistency: max(bar) in events vs num_bars
+    # events가 progressive로 늘어난 경우 grid를 확장
     max_event_bar = 0
     if events:
-        max_event_bar = max(int(e.get("bar", 0)) for e in events)
-    
+        max_event_bar = max(int(e.get("bar", 0) or 0) for e in events)
+
     if max_event_bar >= num_bars:
         print(f"[WARN] max_event_bar ({max_event_bar}) >= grid num_bars ({num_bars}). Auto-expanding.")
         num_bars = max_event_bar + 1
+        grid_json["num_bars"] = num_bars  # grid_json에도 반영
+
+    # t_step을 num_bars까지 확장(이게 8초 문제의 핵심 해결)
+    _ensure_t_step_extended(grid_json, num_bars)
 
     total_sec = num_bars * tbar
     total_samples = int(round(total_sec * target_sr)) + 1
 
     mix = np.zeros(total_samples, dtype=np.float32)
 
-    # micro_offset 안전 제한(선택)
-    half_step_ms = (tstep * 0.5) * 1000.0 if tstep > 0 else 0.0
-
     for ev in events:
         sample_id = ev.get("sample_id")
+        role = str(ev.get("role", "") or "").upper()
 
         # velocity
         vel = float(ev.get("vel", 1.0) or 1.0)
         if "velocity" in ev and ev["velocity"] is not None:
-            # MIDI velocity (0..127)
-            vel = float(ev["velocity"]) / 127.0
+            vel = float(ev["velocity"]) / 127.0  # MIDI velocity (0..127)
         vel = _clamp(vel, 0.0, 1.5)  # 약간의 headroom
 
         # duration
         dur_steps = int(ev.get("dur_steps", 1) or 1)
         dur_steps = max(1, dur_steps)
 
-        # micro
+        # micro (현재 0 고정)
         # micro_ms = float(ev.get("micro_offset_ms", 0.0) or 0.0)
         micro_ms = 0.0
+        _ = micro_ms  # unused (kept for readability)
 
         # sample path
         wav_path = _resolve_sample_path(ev, sample_root=sample_root, sample_id=sample_id)
@@ -189,27 +212,24 @@ def render_events(
         if max_len > 0 and len(y) > max_len:
             y = y[:max_len]
 
+        # TEXTURE: 짧은 샘플이면 해당 dur_steps 길이만큼 루프해서 깔기
+        # (texture는 대개 배경음이라 "한 마디/여러 스텝 지속"이 자연스러움)
+        if role == "TEXTURE" and max_len > 0 and len(y) < max_len:
+            reps = (max_len + len(y) - 1) // len(y)
+            y = np.tile(y, reps)[:max_len]
+
         # fade로 클릭 방지
         y = apply_fade(y, fade_ms=fade_ms, sr=target_sr)
 
         # apply velocity
         y = y * vel
 
-        # === 타임 계산 (핵심) ===
-        # grid.t_step 기반 + micro_offset
-        # bar/step 인덱스 방어
-        # ev_for_time = dict(ev)
-        # ev_for_time["micro_offset_ms"] = 0.0
-        # ev_for_time["micro_offset_ms"] = micro_ms  # clamp된 값 사용
+        # 타임 계산(핵심): bar clamp 금지 + t_step 부족 시 공식 계산
         t = playback_time(grid_json, ev)
-
-        # 음수 방지
         if t < 0:
             t = 0.0
 
-        # sample index는 round가 덜 한쪽으로 치우침
         start = int(round(t * target_sr))
-
         if start < 0 or start >= total_samples:
             continue
 
