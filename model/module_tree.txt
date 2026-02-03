@@ -2,6 +2,8 @@ model/
     __init__.py
     main.py
     requirements.txt
+    inputs/
+        (various input wav files...)
     pipeline/
         __init__.py
         model_pipeline_overview.md
@@ -75,7 +77,7 @@ model/
             verify_transformer.py
             x_transformer_1_23_2.py
             models/
-                Ultimate_Drums_Transformer_Small_Trained_Model_VER4_VEL_4L_14597_steps_0.3894_loss_0.876_acc.pth
+                (model checkpoints...)
     stage5_note_gen/
         __init__.py
         grid_io.py
@@ -99,5 +101,4 @@ model/
     stage7_render/
         __init__.py
         audio_renderer.py
-        export_mp3.py
-        render_wav.py
+        export_audio.py
