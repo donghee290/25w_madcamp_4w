@@ -41,3 +41,30 @@ class SampleSelector:
         sid = ids[i % len(ids)]
         self._rr_idx[role_u] = i + 1
         return sid
+
+    def get_filepath(self, sample_id: str) -> Optional[str]:
+        # DEBUG: Print structure for first call or specific ID
+        debug = (sample_id == "drums")
+        
+        for pool_key, pool_data in self.pools.items():
+             if isinstance(pool_data, list):
+                 if debug: print(f"[DEBUG] Checking pool list {pool_key} (len={len(pool_data)})...")
+                 for s in pool_data:
+                     if isinstance(s, dict):
+                         sid = str(s.get("sample_id"))
+                         if debug: print(f"[DEBUG]   Compare '{sid}' vs '{sample_id}'")
+                         if sid == str(sample_id):
+                             fp = s.get("filepath")
+                             if debug: print(f"[DEBUG]   MATCH! filepath={fp}")
+                             return fp
+             elif isinstance(pool_data, dict):
+                 if debug: print(f"[DEBUG] Checking pool dict {pool_key}...")
+                 samples = pool_data.get("samples", [])
+                 if isinstance(samples, list):
+                     for s in samples:
+                         if isinstance(s, dict):
+                             sid = str(s.get("sample_id"))
+                             if sid == str(sample_id):
+                                 return s.get("filepath")
+        if debug: print(f"[DEBUG] Failed to find filepath for {sample_id}")
+        return None

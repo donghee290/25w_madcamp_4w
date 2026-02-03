@@ -24,6 +24,7 @@ class Event:
     step: int
     role: str                 # CORE/ACCENT/MOTION/FILL/TEXTURE
     sample_id: str
+    filepath: Optional[str]   # Added
     vel: float                # 0..1
     dur_steps: int            # >=1
     micro_offset_ms: float    # ms

@@ -5,8 +5,7 @@ Executes the complete Stage 1 preprocessing:
   2. Demucs drum stem extraction (CPU/GPU auto-select)
   3. Multi-band onset detection
   4. Hit slicing + deduplication
-  5. DSP role classification (CORE/ACCENT/MOTION/FILL/TEXTURE)
-  6. Pool balancing → master kit output
+  5. Save as flat samples
 
 Usage:
   python -m pipeline.step1_run_preprocess --input_dir /path/to/audio --out_dir /path/to/output
@@ -64,9 +63,7 @@ from stage1_preprocess.io.utils import setup_logging, load_audio, save_audio, en
 from stage1_preprocess.io.ingest import scan_dataset, random_sample
 from stage1_preprocess.separation.separator import extract_drum_stem
 from stage1_preprocess.analysis.detector import detect_onsets
-from stage1_preprocess.slicing.slicer import build_kit_from_audio, normalize_hit
-from stage1_preprocess.sequencer import load_kit, render_and_save
-from stage1_preprocess.events import generate_skeleton
+from stage1_preprocess.slicing.slicer import extract_samples, normalize_hit
 
 
 # ---------------------------------------------------------------------------
@@ -75,27 +72,40 @@ from stage1_preprocess.events import generate_skeleton
 
 def process_single_file(
     audio_path: Path,
-    output_dir: Path,
+    samples_dir: Path,
     config: PipelineConfig,
-) -> Optional[Path]:
-    """Process a single audio file through the full pipeline."""
-    file_dir = ensure_dir(output_dir / audio_path.stem)
+) -> int:
+    """Process a single audio file and save samples to samples_dir."""
+    # Use a temp dir for demucs
+    # samples_dir is run_dir/samples. We want run_dir/temp_demucs
+    temp_work_dir = samples_dir.parent / "temp_demucs" / audio_path.stem
+    ensure_dir(temp_work_dir)
 
     try:
         # Step 1: Extract drum stem
         logger.info(f"=== Processing: {audio_path.name} ===")
         drums_path = extract_drum_stem(
             audio_path,
-            file_dir / "demucs",
+            temp_work_dir,
             model=config.demucs_model,
             device=config.demucs_device,
             sr=config.sr,
             chunk_duration_s=config.chunk_duration_s,
         )
 
-        # Step 2: Load drum stem
+        if not drums_path or not drums_path.exists():
+            logger.warning(f"Demucs failed for {audio_path.name}")
+            return 0
+
         y_drums, _ = load_audio(drums_path, sr=config.sr)
         logger.info(f"Drum stem: {len(y_drums)/config.sr:.1f}s")
+        
+        # Cleanup Demucs output immediately
+        import shutil
+        try:
+            shutil.rmtree(temp_work_dir)
+        except Exception:
+            pass
 
         # Step 3: Detect onsets
         onsets = detect_onsets(
@@ -106,12 +116,14 @@ def process_single_file(
 
         if not onsets:
             logger.warning(f"No onsets detected in {audio_path.name}")
-            return None
+            return 0
 
-        # Step 4: Slice, deduplicate, save
-        kit_dir = file_dir / "kit"
-        _manifest_path, _representatives = build_kit_from_audio(
-            y_drums, config.sr, onsets, kit_dir,
+        # Step 4: Slice and save directly to common samples dir
+        # We assume file_stem ensures uniqueness. Step 1 usually runs sequentially or needs careful naming if parallel.
+        saved_paths = extract_samples(
+            y_drums, config.sr, onsets,
+            output_dir=samples_dir,
+            file_stem=audio_path.stem,
             max_duration_s=config.max_hit_duration_s,
             fade_out_ms=config.fade_out_ms,
             trim_db=config.trim_silence_db,
@@ -119,143 +131,57 @@ def process_single_file(
             dedup_enabled=config.dedup_enabled,
             dedup_threshold=config.dedup_threshold,
         )
-
-        return kit_dir
+        
+        return len(saved_paths)
 
     except Exception as e:
         logger.error(f"Failed to process {audio_path.name}: {e}")
-        return None
-
-
-def merge_kits(
-    kit_dirs: List[Path],
-    output_dir: Path,
-    sr: int = 44100,
-    best_per_class: int = 20,
-) -> Path:
-    """Merge kits into master kit (simplified - no role balancing)."""
-    master_dir = ensure_dir(output_dir / "master_kit")
-
-    # Gather all samples from all kits
-    all_samples = []
-
-    logger.info("Merging kits (simplified - no role classification)...")
-
-    for kit_dir in kit_dirs:
-        kit = load_kit(kit_dir, sr=sr)
-        for role, role_samples in kit.items():
-            for s in role_samples:
-                all_samples.append(s)
-
-    # Save all samples to dummy folder
-    dummy_dir = ensure_dir(master_dir / "dummy")
-    manifest = {"sr": sr, "roles": {"dummy": []}}
-    total = 0
-
-    # Sort by energy (RMS)
-    samples_with_rms = []
-    for s in all_samples:
-        rms = np.sqrt(np.mean(s**2))
-        samples_with_rms.append((rms, s))
-
-    samples_with_rms.sort(key=lambda x: x[0], reverse=True)
-
-    # Limit to best_per_class if needed
-    if best_per_class > 0:
-        samples_with_rms = samples_with_rms[:best_per_class]
-
-    for i, (rms, sample) in enumerate(samples_with_rms, start=1):
-        sample = normalize_hit(sample)
-        fname = f"dummy_{i:03d}.wav"
-        save_audio(dummy_dir / fname, sample, sr)
-
-        manifest["roles"]["dummy"].append({
-            "file": fname,
-            "duration_s": round(len(sample) / sr, 4),
-            "rms": round(float(rms), 6)
-        })
-        total += 1
-
-    manifest["total_samples"] = total
-    (master_dir / "kit_manifest.json").write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8"
-    )
-
-    logger.info(f"Master kit created: {total} samples in {master_dir}")
-    return master_dir
-
-
-def generate_test_loops(
-    kit_dir: Path,
-    output_dir: Path,
-    sr: int = 44100,
-    bpm: float = 120.0,
-    bars: int = 4,
-) -> List[Path]:
-    """Generate test loops using EventGrid generator."""
-    loops_dir = ensure_dir(output_dir / "test_loops")
-    kit = load_kit(kit_dir, sr=sr)
-
-    if not kit:
-        logger.warning("Empty kit, cannot generate loops")
-        return []
-
-    outputs = []
-    
-    # 1. Rock (Core Beat)
-    grid_rock = generate_skeleton(bars=bars, bpm=bpm, kit_dir=str(kit_dir), seed=42)
-    path = render_and_save(grid_rock, kit, loops_dir / f"test_rock_{int(bpm)}.wav", sr=sr, reverb=True)
-    outputs.append(path)
-    
-    # 2. Dense Beat
-    grid_dense = generate_skeleton(bars=bars, bpm=bpm, motion_density=8, seed=99)
-    path_dense = render_and_save(grid_dense, kit, loops_dir / f"test_dense_{int(bpm)}.wav", sr=sr, reverb=True)
-    outputs.append(path_dense)
-
-    return outputs
+        return 0
 
 
 def run_full_pipeline(config: PipelineConfig) -> Path:
     """Run complete pipeline."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = ensure_dir(config.output_root / f"stage1_{timestamp}")
+    
+    # We create a single 'samples' directory for all outputs
+    master_samples_dir = ensure_dir(run_dir / "samples")
 
     logger.info(f"=== DrumGen-X Pipeline ===")
     
     # 1. Scan & Select
     all_files = scan_dataset(config.dataset_root)
+    # If config.n_files is 0, process all? Assuming logic in main handles this or ingestion.
+    # Usually random_sample handles limiting.
     selected = random_sample(all_files, config.n_files)
     logger.info(f"Selected {len(selected)} / {len(all_files)} files")
 
     # 2. Process
-    kit_dirs = []
     results = []
+    total_samples = 0
+    
     for audio_path in selected:
-        kit_dir = process_single_file(audio_path, run_dir / "files", config)
-        status = "success" if kit_dir else "failed"
-        results.append({"file": audio_path.name, "status": status})
-        if kit_dir:
-            kit_dirs.append(kit_dir)
+        n_samples = process_single_file(audio_path, master_samples_dir, config)
+        status = "success" if n_samples > 0 else "no_samples"
+        results.append({"file": audio_path.name, "status": status, "samples": n_samples})
+        total_samples += n_samples
 
-    if not kit_dirs:
-        logger.error("Pipeline failed: No kits produced.")
-        return run_dir
-
-    # 3. Merge & Balance
-    master_dir = merge_kits(kit_dirs, run_dir, sr=config.sr, best_per_class=config.best_per_class)
-
-    # 4. Loop Gen
-    loops = generate_test_loops(master_dir, run_dir, sr=config.sr)
-
-    # 5. Report
+    # 3. Report
     report = {
         "timestamp": timestamp,
         "results": results,
-        "master_kit": str(master_dir),
-        "loops": [str(p) for p in loops]
+        "total_samples": total_samples,
+        "samples_dir": str(master_samples_dir),
     }
     (run_dir / "pipeline_report.json").write_text(json.dumps(report, indent=2))
     
+    # Try to cleanup temp dir if it exists
+    temp_dir = run_dir / "temp_demucs"
+    if temp_dir.exists():
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    logger.info(f"Stage 1 complete: {total_samples} samples -> {master_samples_dir}")
     return run_dir
 
 
@@ -265,7 +191,7 @@ def run_full_pipeline(config: PipelineConfig) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Stage 1: Audio Preprocessing (Demucs → Onset → Slice → Dedup → Classify)",
+        description="Stage 1: Audio Preprocessing (Demucs → Onset → Slice → Dedup)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -322,9 +248,7 @@ def parse_args() -> argparse.Namespace:
     # Batch
     parser.add_argument("--n-files", type=int, default=5,
                         help="Number of files to process in batch mode")
-    parser.add_argument("--best-per-class", type=int, default=10,
-                        help="Max samples per role in master kit")
-
+    
     # Logging
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Enable debug logging")
@@ -359,7 +283,6 @@ def main():
         dedup_enabled=not args.no_dedup,
         n_files=args.n_files,
         dataset_root=args.input_dir, # Will be None if single file mode
-        best_per_class=args.best_per_class,
     )
 
     t_start = time.time()
@@ -372,13 +295,16 @@ def main():
             sys.exit(1)
 
         config.output_root = args.out_dir
-        result_dir = process_single_file(audio_path, args.out_dir, config)
+        # For single file, mimicking structure
+        run_dir = ensure_dir(args.out_dir / "single_run")
+        samples_dir = ensure_dir(run_dir / "samples")
         
-        if result_dir:
-            print(f"\nDone: Stage 1 single file -> {result_dir}")
+        n_samples = process_single_file(audio_path, samples_dir, config)
+        
+        if n_samples > 0:
+            print(f"\nDone: Stage 1 single file -> {samples_dir} ({n_samples} samples)")
         else:
-            print(f"\nFailed: Processing returned None")
-            sys.exit(1)
+            print(f"\nCompleted with 0 samples extracted.")
 
     else:
         # Batch mode

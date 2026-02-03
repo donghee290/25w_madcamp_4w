@@ -14,25 +14,13 @@ from .analysis.features import extract_dsp_features
 from .analysis.detector import detect_onsets
 
 # Slicing
-from .slicing.slicer import slice_hits, normalize_hit, classify_and_organize, build_kit_from_audio
+from .slicing.slicer import slice_hits, normalize_hit, save_samples, extract_samples
 
 # Deduplication
 from .cleaning.dedup import deduplicate_hits
 
-# Role scoring (root-level modules)
-from .scoring import DrumRole, calculate_role_scores, get_best_role, fuse_scores, normalize_scores_softmax, calculate_confidence, get_best_role_with_confidence
-
-# Pool balancing
-from .pool_balancer import balance_pools
-
-# Event grid & sequencing
-from .events import DrumEvent, EventGrid, generate_skeleton, display_grid
-
-# Sequencer (rendering)
-from .sequencer import load_kit, render_event_grid, render_and_save
-
 # Configuration
-from .config import PipelineConfig, SequencerConfig, DrumClass
+from .config import PipelineConfig
 
 __all__ = [
     # I/O
@@ -43,18 +31,9 @@ __all__ = [
     # Analysis
     "extract_dsp_features", "detect_onsets",
     # Slicing
-    "slice_hits", "normalize_hit", "classify_and_organize", "build_kit_from_audio",
+    "slice_hits", "normalize_hit", "save_samples", "extract_samples",
     # Deduplication
     "deduplicate_hits",
-    # Scoring
-    "DrumRole", "calculate_role_scores", "get_best_role", "fuse_scores",
-    "normalize_scores_softmax", "calculate_confidence", "get_best_role_with_confidence",
-    # Pool
-    "balance_pools",
-    # Events
-    "DrumEvent", "EventGrid", "generate_skeleton", "display_grid",
-    # Sequencer
-    "load_kit", "render_event_grid", "render_and_save",
     # Config
-    "PipelineConfig", "SequencerConfig", "DrumClass",
+    "PipelineConfig",
 ]

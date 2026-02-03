@@ -89,6 +89,7 @@ def normalize_notes_to_event_grid(
         dur_steps = dur_steps_from_times(grid, start, end)
 
         sid = selector.pick(role)
+        filepath = selector.get_filepath(sid) # Need to implement get_filepath in selector
 
         out.append(
             Event(
@@ -96,6 +97,7 @@ def normalize_notes_to_event_grid(
                 step=int(k),
                 role=role,
                 sample_id=sid,
+                filepath=filepath,
                 vel=float(vel01),
                 dur_steps=int(dur_steps),
                 micro_offset_ms=float(micro_ms),
@@ -125,6 +127,7 @@ def dump_event_grid(events: List[Event]) -> List[Dict[str, Any]]:
                 "step": e.step,
                 "role": e.role,
                 "sample_id": e.sample_id,
+                "filepath": e.filepath,
                 "vel": e.vel,
                 "dur_steps": e.dur_steps,
                 "micro_offset_ms": e.micro_offset_ms,

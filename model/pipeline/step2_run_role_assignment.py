@@ -176,8 +176,20 @@ def build_assigner_config(cfg_dict: Dict[str, Any], prompts_path: str) -> tuple[
 
 def list_audio_files(input_dir: str) -> List[Path]:
     root = Path(input_dir)
+    
+    # Priority: Check if 'master_kit/samples' exists, then 'master_kit', then root
+    master_kit_samples = root / "master_kit" / "samples"
+    master_kit = root / "master_kit"
+    
+    if master_kit_samples.exists() and master_kit_samples.is_dir():
+        search_root = master_kit_samples
+    elif master_kit.exists() and master_kit.is_dir():
+        search_root = master_kit
+    else:
+        search_root = root
+        
     files = []
-    for p in root.rglob("*"):
+    for p in search_root.rglob("*"):
         if p.is_file() and p.suffix.lower() in AUDIO_EXTS:
             files.append(p)
     return sorted(files)

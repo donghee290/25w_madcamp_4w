@@ -27,6 +27,7 @@ def shift_bars(events: List[Event], bar_offset: int) -> List[Event]:
                 step=e.step,
                 role=e.role,
                 sample_id=e.sample_id,
+                filepath=e.filepath, # Add filepath
                 vel=e.vel,
                 dur_steps=e.dur_steps,
                 micro_offset_ms=e.micro_offset_ms,

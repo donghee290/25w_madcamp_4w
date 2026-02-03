@@ -83,8 +83,10 @@ def render_events(
                     break
         
         if wav_path is None:
-            # print(f"[WARN] sample not found: {sample_id}")
+            print(f"[WARN] sample not found for id: {sample_id} (path_str: {path_str}) in root: {sample_root}")
             continue
+        
+        # print(f"[DEBUG] Valid sample: {wav_path}")
 
         y = load_wav_mono(wav_path, target_sr)
 

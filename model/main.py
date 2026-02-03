@@ -21,6 +21,20 @@ def run_step(step_name, cmd_args):
         print(f"[pipeline] {step_name} Failed!")
         sys.exit(e.returncode)
 
+def get_latest_file(directory: Path, pattern: str) -> Path:
+    files = list(directory.glob(pattern))
+    if not files:
+        raise FileNotFoundError(f"No files matching {pattern} in {directory}")
+    
+    def extract_version(p: Path) -> int:
+        try:
+            # Pattern {name}_{ver}.{ext}
+            return int(p.stem.rsplit("_", 1)[1])
+        except (IndexError, ValueError):
+            return 0
+            
+    return sorted(files, key=extract_version)[-1]
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--input_dir", type=str, required=True, help="Raw audio input directory")
@@ -51,15 +65,24 @@ def main():
         "--out_dir", str(dirs["s1"])
     ])
     
+    # Find latest stage1 output directory to avoid re-processing old runs
+    # Pattern: stage1_YYYYMMDD_HHMMSS
+    stage1_dirs = sorted(list(dirs["s1"].glob("stage1_*")))
+    if not stage1_dirs:
+        print("[pipeline] Error: No Stage 1 output found!")
+        sys.exit(1)
+    latest_s1_dir = stage1_dirs[-1]
+    print(f"[pipeline] Using latest Stage 1 output: {latest_s1_dir}")
+    
     # Stage 2: Role Assignment
     run_step("step2_run_role_assignment.py", [
-        "--input_dir", str(dirs["s1"]),
+        "--input_dir", str(latest_s1_dir),
         "--out_dir", str(dirs["s2"]),
         "--limit", "0" # Process all
     ])
     
     # Find latest pools.json
-    pools_json = sorted(list(dirs["s2"].glob("role_pools_*.json")))[-1]
+    pools_json = get_latest_file(dirs["s2"], "role_pools_*.json")
     
     # Stage 3: Grid & Skeleton
     run_step("step3_run_grid_and_skeleton.py", [
@@ -71,8 +94,8 @@ def main():
     ])
     
     # Find generated files
-    grid_json = sorted(list(dirs["s3"].glob("grid_*.json")))[-1]
-    event_grid_json = sorted(list(dirs["s3"].glob("event_grid_*.json")))[-1]
+    grid_json = get_latest_file(dirs["s3"], "grid_*.json")
+    event_grid_json = get_latest_file(dirs["s3"], "event_grid_*.json")
     
     # Stage 4: Model Transformer
     run_step("step4_run_model_transformer.py", [
@@ -85,7 +108,7 @@ def main():
     ])
     
     # Find transformer outputs
-    notes_json = sorted(list(dirs["s4"].glob("event_grid_transformer_*.json")))[-1]
+    notes_json = get_latest_file(dirs["s4"], "event_grid_transformer_*.json")
 
     # Stage 5: Note & MIDI (Mapping Back)
     run_step("step5_run_note_and_midi.py", [
@@ -96,12 +119,14 @@ def main():
         "--seed", str(args.seed)
     ])
     
-    final_events_json = sorted(list(dirs["s5"].glob("event_grid_*.json")))[-1]
+    final_events_json = get_latest_file(dirs["s5"], "event_grid_*.json")
     # Check if updated grid file exists in s5
-    s5_grids = sorted(list(dirs["s5"].glob("grid_*.json")))
-    if s5_grids:
-        grid_json = s5_grids[-1]
+    try:
+        s5_grid = get_latest_file(dirs["s5"], "grid_*.json")
+        grid_json = s5_grid
         print(f"[pipeline] Detected updated grid in Stage 5: {grid_json}")
+    except FileNotFoundError:
+        pass
     
     # Stage 6: Editor (Optimization/Export)
     run_step("step6_run_editor.py", [
@@ -113,7 +138,7 @@ def main():
         "--render_preview", "1"
     ])
     
-    editor_events_json = sorted(list(dirs["s6"].glob("event_grid_*.json")))[-1]
+    editor_events_json = get_latest_file(dirs["s6"], "event_grid_*.json")
 
     # Stage 7: Final Render
     run_step("step7_run_render_final.py", [
