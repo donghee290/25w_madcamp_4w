@@ -20,13 +20,30 @@ def parse_args():
     p.add_argument("--mp3", type=int, default=1)
     return p.parse_args()
 
+def get_next_version(out_dir: Path, prefix: str) -> int:
+    existing = list(out_dir.glob(f"{prefix}_*.wav"))
+    max_ver = 0
+    for p in existing:
+        try:
+            stem = p.stem  # {prefix}_{n}
+            parts = stem.rsplit("_", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                ver = int(parts[1])
+                if ver > max_ver:
+                    max_ver = ver
+        except ValueError:
+            pass
+    return max_ver + 1
+
+
 def main():
     args = parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    wav_path = out_dir / f"{args.name}.wav"
-    mp3_path = out_dir / f"{args.name}.mp3"
+    ver = get_next_version(out_dir, args.name)
+    wav_path = out_dir / f"{args.name}_{ver}.wav"
+    mp3_path = out_dir / f"{args.name}_{ver}.mp3"
 
     render_wav_from_event_grid(
         grid_json_path=args.grid_json,

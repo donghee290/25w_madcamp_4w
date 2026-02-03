@@ -11,6 +11,7 @@ from .grid_io import build_repeated_grid
 class ProgressiveConfig:
     segment_bars: int = 4
     layers: Tuple[str, ...] = ("CORE", "ACCENT", "MOTION", "FILL")  # TEXTURE는 보통 별도
+    final_repeat: int = 2  # 마지막 Full 단계를 몇 번 더 반복할지
 
 
 def filter_by_roles(events: List[Event], allowed: set[str]) -> List[Event]:
@@ -69,10 +70,30 @@ def build_progressive_timeline(
                 "bar_offset": bar_offset,
                 "allowed_roles": sorted(list(allowed)),
                 "num_events": len(layer_events),
+                "type": "buildup"
             }
         )
 
-    total_bars = seg * len(cfg.layers)
+    # Final repeat (Full intensity)
+    # 마지막 레이어 상태(allowed가 전부 포함된 상태)를 그대로 유지하며 뒤에 붙임
+    final_layer_events = filter_by_roles(base_events, allowed)
+    final_layer_events = [e for e in final_layer_events if 0 <= e.bar < seg] # base loop
+
+    current_seg_idx = len(cfg.layers)
+    for r in range(cfg.final_repeat):
+        bar_offset = current_seg_idx * seg
+        staged_events.extend(shift_bars(final_layer_events, bar_offset))
+        
+        meta_layers.append({
+            "segment_index": current_seg_idx,
+            "bar_offset": bar_offset,
+            "allowed_roles": sorted(list(allowed)),
+            "num_events": len(final_layer_events),
+            "type": "repeat_full"
+        })
+        current_seg_idx += 1
+
+    total_bars = seg * current_seg_idx
     new_grid = build_repeated_grid(base_grid, repeat_bars=total_bars)
     staged_events.sort(key=lambda e: (e.bar, e.step))
     meta = {"segment_bars": seg, "layers": list(cfg.layers), "segments": meta_layers}

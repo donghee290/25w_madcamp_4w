@@ -97,6 +97,11 @@ def main():
     ])
     
     final_events_json = sorted(list(dirs["s5"].glob("event_grid_*.json")))[-1]
+    # Check if updated grid file exists in s5
+    s5_grids = sorted(list(dirs["s5"].glob("grid_*.json")))
+    if s5_grids:
+        grid_json = s5_grids[-1]
+        print(f"[pipeline] Detected updated grid in Stage 5: {grid_json}")
     
     # Stage 6: Editor (Optimization/Export)
     run_step("step6_run_editor.py", [

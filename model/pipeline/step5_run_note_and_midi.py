@@ -31,9 +31,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--clamp_ms", type=float, default=40.0)
 
     # progressive (core-only 4 bars -> +accent 4 bars -> ...)
-    p.add_argument("--progressive", type=int, default=0)
+    p.add_argument("--progressive", type=int, default=1, help="If 1, generates full song structure using progressive layering")
     p.add_argument("--segment_bars", type=int, default=4)
     p.add_argument("--layers", type=str, default="CORE,ACCENT,MOTION,FILL")  # comma sep
+    p.add_argument("--repeat_full", type=int, default=4, help="Number of times to repeat the final full section")
 
     return p.parse_args()
 
@@ -67,7 +68,7 @@ def main() -> None:
         ),
     )
 
-    events = normalize_notes_to_event_grid(
+    base_loop_events = normalize_notes_to_event_grid(
         grid=grid,
         notes=notes,
         selector=selector,
@@ -75,58 +76,66 @@ def main() -> None:
         clamp_ms=float(args.clamp_ms),
     )
 
+    # If progressive is ON (default), we build the full song structure
+    # and use THAT as the main output.
+    if int(args.progressive) == 1:
+        print("[INFO] Building progressive song structure...")
+        layers = tuple([x.strip().upper() for x in str(args.layers).split(",") if x.strip()])
+        pcfg = ProgressiveConfig(
+            segment_bars=int(args.segment_bars), 
+            layers=layers,
+            final_repeat=int(args.repeat_full)
+        )
+        final_grid, final_events, final_meta = build_progressive_timeline(grid, base_loop_events, pcfg)
+        
+        # We also save the base loop for reference
+        loop_ver = get_next_version(out_dir, prefix="event_grid_loop")
+        out_dir.joinpath(f"event_grid_loop_{loop_ver}.json").write_text(
+            json.dumps(dump_event_grid(base_loop_events), ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    else:
+        # If disabled, final output is just the base loop
+        print("[INFO] progressive=0, outputting 4-bar loop only.")
+        final_grid = grid
+        final_events = base_loop_events
+        final_meta = {"progressive": False}
+
+    # Generate version for MAIN output
     ver = get_next_version(out_dir, prefix="event_grid")
     event_path = out_dir / f"event_grid_{ver}.json"
     midi_path = out_dir / f"notes_{ver}.mid"
     meta_path = out_dir / f"note_meta_{ver}.json"
 
-    event_path.write_text(json.dumps(dump_event_grid(events), ensure_ascii=False, indent=2), encoding="utf-8")
-    export_event_grid_to_midi(grid, events, midi_path)
+    # Save MAIN output
+    event_path.write_text(json.dumps(dump_event_grid(final_events), ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    # Also save the GRID logic (which might be expanded)
+    grid_path = out_dir / f"grid_{ver}.json"
+    grid_path.write_text(json.dumps(dump_grid_json(final_grid), ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    export_event_grid_to_midi(final_grid, final_events, midi_path)
 
-    meta = {
+    base_meta_info = {
         "version": ver,
-        "grid_json": str(Path(args.grid_json)),
+        "grid_json": str(grid_path),
+        "input_grid_json": str(Path(args.grid_json)),
         "notes_json": str(Path(args.notes_json)),
         "pools_json": str(Path(args.pools_json)),
         "seed": int(args.seed),
         "selector_mode": str(args.selector_mode),
         "clamp_ms": float(args.clamp_ms),
-        "num_events": len(events),
-        "progressive": bool(int(args.progressive)),
+        "num_events": len(final_events),
+        "progressive_info": final_meta,
     }
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    meta_path.write_text(json.dumps(base_meta_info, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("[DONE] stage6 note + midi")
+    print("[DONE] stage5 finished")
+    print(" - grid:", str(grid_path))
     print(" - event_grid:", str(event_path))
     print(" - midi:", str(midi_path))
     print(" - meta:", str(meta_path))
-    print(" - num_events:", len(events))
-
-    if int(args.progressive) == 1:
-        layers = tuple([x.strip().upper() for x in str(args.layers).split(",") if x.strip()])
-        pcfg = ProgressiveConfig(segment_bars=int(args.segment_bars), layers=layers)
-        new_grid, prog_events, prog_meta = build_progressive_timeline(grid, events, pcfg)
-
-        ver2 = get_next_version(out_dir, prefix="event_grid_progressive")
-        grid2_path = out_dir / f"grid_progressive_{ver2}.json"
-        event2_path = out_dir / f"event_grid_progressive_{ver2}.json"
-        midi2_path = out_dir / f"notes_progressive_{ver2}.mid"
-        meta2_path = out_dir / f"note_progressive_meta_{ver2}.json"
-
-        grid2_path.write_text(json.dumps(dump_grid_json(new_grid), ensure_ascii=False, indent=2), encoding="utf-8")
-        event2_path.write_text(json.dumps(dump_event_grid(prog_events), ensure_ascii=False, indent=2), encoding="utf-8")
-        export_event_grid_to_midi(new_grid, prog_events, midi2_path)
-
-        meta2 = {"version": ver2, "progressive": prog_meta, "num_events": len(prog_events)}
-        meta2_path.write_text(json.dumps(meta2, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        print("[DONE] progressive layered output")
-        print(" - grid:", str(grid2_path))
-        print(" - event_grid:", str(event2_path))
-        print(" - midi:", str(midi2_path))
-        print(" - meta:", str(meta2_path))
-        print(" - total_bars:", new_grid.num_bars)
-        print(" - num_events:", len(prog_events))
+    print(" - total_bars:", final_grid.num_bars)
+    print(" - num_events:", len(final_events))
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import numpy as np
 import soundfile as sf
 
 
-logger = logging.getLogger("drumgenx")
+logger = logging.getLogger("preprocess")
 
 
 def setup_logging(level: int = logging.INFO) -> None:
