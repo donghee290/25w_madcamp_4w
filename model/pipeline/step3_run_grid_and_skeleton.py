@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 
 
+import sys
+# Add model dir to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from stage3_beat_grid.grid import GridConfig, build_grid
 from stage3_beat_grid.patterns.skeleton import SkeletonConfig, build_skeleton_events
 
@@ -234,26 +238,9 @@ def main() -> None:
     print(" - meta:", str(base_meta))
     print(" - num_events:", len(events_json))
 
-    # 4) render
-    try:
-        from stage3_beat_grid.test_audio_render.render import render_events
-
-        sample_root = Path(args.sample_root)
-        print(f"[INFO] Rendering audio to {base_wav} ...")
-        print(f"[INFO] sample_root: {sample_root}")
-
-        render_events(
-            grid_json=grid_json,
-            events=events_json,
-            sample_root=sample_root,
-            out_wav=base_wav,
-            target_sr=int(args.render_sr),
-        )
-        print("[DONE] audio rendered:", str(base_wav))
-    except ImportError:
-        print("[WARN] Could not import stage3_beat_grid.test_audio_render.render. Audio not generated.")
-    except Exception as e:
-        print(f"[ERROR] Audio rendering failed: {e}")
+    # 4) Audio render skipped in Stage 3 (moved to Stage 7)
+    # if you really need it, import form stage7_render.audio_renderer
+    print("[INFO] Audio rendering skipped in Stage 3 (as requested).")
 
 
 if __name__ == "__main__":

@@ -2,8 +2,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stage9_render.render_wav import render_wav_from_event_grid
-from stage9_render.export_mp3 import wav_to_mp3
+import sys
+# Add model dir to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
+from stage7_render.render_wav import render_wav_from_event_grid
+from stage7_render.export_mp3 import wav_to_mp3
 
 def parse_args():
     p = argparse.ArgumentParser()

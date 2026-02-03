@@ -7,7 +7,9 @@ import math
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+import sys
+# Add model dir to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
 
 
 # ----------------------------
@@ -376,14 +378,7 @@ def try_render_preview(
     기존 프로젝트에 있는 render_events를 그대로 활용.
     - sample_id -> wav 파일을 sample_root에서 찾는 로직은 render.py가 담당한다고 가정.
     """
-    try:
-        from beat_grid_trial1.test_audio_render.render import render_events  # type: ignore
-    except Exception:
-        # 다른 경로도 시도
-        try:
-            from beat_grid.test_audio_render.render import render_events  # type: ignore
-        except Exception as e:
-            raise RuntimeError("render_events를 import할 수 없습니다. render 모듈 경로를 확인하세요.") from e
+    from stage7_render.audio_renderer import render_events
 
     render_events(
         grid_json=grid_json,

@@ -5,12 +5,16 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from stage5_note_and_midi.grid_io import load_grid_json, dump_grid_json
-from stage5_note_and_midi.pools_io import load_pools_json
-from stage5_note_and_midi.sample_select import SampleSelector, SampleSelectorConfig
-from stage5_note_and_midi.normalize import load_note_list_json, normalize_notes_to_event_grid, dump_event_grid
-from stage5_note_and_midi.midi_export import export_event_grid_to_midi
-from stage5_note_and_midi.progressive import ProgressiveConfig, build_progressive_timeline
+import sys
+# Add model dir to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
+from stage5_note_gen.grid_io import load_grid_json, dump_grid_json
+from stage5_note_gen.pools_io import load_pools_json
+from stage5_note_gen.sample_select import SampleSelector, SampleSelectorConfig
+from stage5_note_gen.normalize import load_note_list_json, normalize_notes_to_event_grid, dump_event_grid
+from stage5_note_gen.midi_export import export_event_grid_to_midi
+from stage5_note_gen.progressive import ProgressiveConfig, build_progressive_timeline
 
 
 def parse_args() -> argparse.Namespace:

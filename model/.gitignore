@@ -12,7 +12,7 @@ outs_model/
 outs_role/
 outs_transformer/
 examples/
-input_samples/
+inputs/
 
 # System
 .DS_Store

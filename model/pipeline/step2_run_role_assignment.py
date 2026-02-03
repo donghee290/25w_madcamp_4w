@@ -11,6 +11,11 @@ import random
 import re
 from tqdm import tqdm
 
+import sys
+from pathlib import Path
+# Add model dir to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from stage2_role_assignment.role_assigner import (
     RoleAssigner,
     RoleAssignerConfig,
@@ -37,8 +42,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--input_dir", type=str, required=True)
     p.add_argument("--out_dir", type=str, required=True)
 
-    p.add_argument("--config", type=str, default="role_assignment/configs/role_assignment.yaml")
-    p.add_argument("--prompts", type=str, default="role_assignment/prompts/prompts.yaml")
+    base_dir = Path(__file__).parent.parent
+    config_path = base_dir / "stage2_role_assignment/configs/role_assignment.yaml"
+    prompts_path = base_dir / "stage2_role_assignment/prompts/prompts.yaml"
+
+    p.add_argument("--config", type=str, default=str(config_path))
+    p.add_argument("--prompts", type=str, default=str(prompts_path))
 
     p.add_argument("--limit", type=int, default=0, help="0이면 전체, 아니면 앞에서 N개만")
     return p.parse_args()
