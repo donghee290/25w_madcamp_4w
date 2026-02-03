@@ -27,33 +27,52 @@ logger = logging.getLogger(__name__)
 
 def midi_to_events(midi_path: str, grid: dict, sample_map: dict) -> list:
     """
-    Converts MIDI file to the pipeline's event format.
+    Converts MIDI file to the pipeline's event format with micro-timing.
     """
     pm = pretty_midi.PrettyMIDI(str(midi_path))
     events = []
     
-    # Assuming track 0 or the Drum track (channel 10)
-    # If the transformer outputs to channel 10 (idx 9), pretty_midi handles it.
+    # Get BPM from grid
+    bpm = grid.get("bpm", 120)
+    # 60 / BPM = seconds per beat
+    # We want to find the nearest "16th note" or "grid step"
+    # Typically grid is 4 steps per beat (16th notes).
+    steps_per_beat = 4
+    seconds_per_step = (60.0 / bpm) / steps_per_beat
     
-    # Merge all notes from all instruments for simplicity (usually just one drum track)
+    # Merge all notes
     notes = []
     for inst in pm.instruments:
         notes.extend(inst.notes)
     
-    # Sort by start time
     notes.sort(key=lambda x: x.start)
     
     for note in notes:
-        # Basic General MIDI Mapping to Pool Keys
-        # This is a heuristic.
-        role = "percussion"
-        if note.pitch in [35, 36]: role = "kick"
-        elif note.pitch in [38, 40]: role = "snare"
-        elif note.pitch in [42, 44, 46]: role = "hat"
-        elif note.pitch in [49, 57]: role = "cymbal"
-        # else: keep 'percussion'
+        # Quantize to nearest step index
+        step_idx = round(note.start / seconds_per_step)
+        quantized_start = step_idx * seconds_per_step
         
-        # Construct Event
+        # Calculate deviation in milliseconds
+        offset_sec = note.start - quantized_start
+        micro_offset_ms = int(offset_sec * 1000)
+        
+        # General MIDI Mapping
+        role = "percussion"
+        # Standard Drum Map
+        # 35,36: Kick
+        # 38,40: Snare
+        # 41,43: Low Tom
+        # 42,44: HiHat (Closed/Pedal)
+        # 46: HiHat Open
+        # 49,57,51,59: Cymbals
+        p = note.pitch
+        if p in [35, 36]: role = "kick"
+        elif p in [38, 40]: role = "snare"
+        elif p in [42, 44]: role = "hat" # Closed
+        elif p == 46: role = "hat" # Open -> maybe map to same role but different sample if supported
+        elif p in [49, 57, 51, 59, 52, 55]: role = "cymbal"
+        elif p in [41, 43, 45, 47, 48, 50]: role = "tom"
+        
         evt = {
             "start": note.start,
             "end": note.end,
@@ -61,7 +80,8 @@ def midi_to_events(midi_path: str, grid: dict, sample_map: dict) -> list:
             "pitch": note.pitch,
             "role": role,
             "is_drum": True,
-            "offset": 0, 
+            "offset": 0, # Legacy field, can be kept as 0 or step offset
+            "micro_offset_ms": micro_offset_ms
         }
         events.append(evt)
         

@@ -23,12 +23,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger("dummy_gen")
 
 try:
-    from stage1_drumgenx.separator import extract_drum_stem
-    from stage1_drumgenx.detector import detect_onsets
-    from stage1_drumgenx.slicer import slice_hits, normalize_hit
-    from stage1_drumgenx.utils import load_audio, save_audio, ensure_dir
+    from stage1_preprocess.separation.separator import extract_drum_stem
+    from stage1_preprocess.analysis.detector import detect_onsets
+    from stage1_preprocess.slicing.slicer import slice_hits, normalize_hit
+    from stage1_preprocess.io.utils import load_audio, save_audio, ensure_dir
 except ImportError:
-    print("Error: drumgenx package not found.")
+    print("Error: stage1_preprocess package not found.")
     sys.exit(1)
 
 def get_fingerprint(y, sr):
