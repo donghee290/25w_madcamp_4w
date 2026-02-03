@@ -1,0 +1,106 @@
+##############################################################################
+# Docker Compose for Reverse Tunneling Gateway
+# 
+# 내부망에서 실행되며, autossh를 통해 외부 VPS와 터널을 형성합니다.
+# Google OAuth 콜백은 VPS를 통해 수신되며, MongoDB Atlas도 터널을 통해 접속합니다.
+##############################################################################
+
+services:
+  #############################################################################
+  # Backend Service (Flask + Google OAuth)
+  #############################################################################
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: soundroutine-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Flask 설정
+      - FLASK_ENV=production
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      
+      # 핵심: 외부 도메인 설정 (리다이렉트 URI 생성에 사용)
+      - EXTERNAL_BASE_URL=${EXTERNAL_BASE_URL}
+      
+      # Google OAuth 설정
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      
+      # JWT 설정
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      
+      # MongoDB 설정 (터널을 통해 접속)
+      # 27017 포트가 막혀있으면 localhost:27017 (터널된 포트)를 사용
+      - SOUNDROUTINE_DB_BACKEND=mongodb
+      - SOUNDROUTINE_MONGO_URI=${MONGO_URI:-mongodb://localhost:27017}
+      - SOUNDROUTINE_MONGO_DB=${MONGO_DB:-soundroutine}
+      - SOUNDROUTINE_MONGO_COLLECTION=jobs
+      
+      # 데이터 경로
+      - SOUNDROUTINE_DATA_ROOT=/app/data
+    volumes:
+      - ./data:/app/data
+      - ./model:/app/model:ro
+    networks:
+      - app-network
+    depends_on:
+      - autossh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  #############################################################################
+  # AutoSSH Service (Reverse Tunnel Manager)
+  #############################################################################
+  autossh:
+    image: jnovack/autossh:latest
+    container_name: soundroutine-autossh
+    restart: always
+    network_mode: host
+    environment:
+      # VPS SSH 연결 정보
+      - SSH_REMOTE_USER=${VPS_USER:-ubuntu}
+      - SSH_REMOTE_HOST=${VPS_HOST:-192.249.19.253}
+      - SSH_REMOTE_PORT=${VPS_SSH_PORT:-22}
+
+      # 리버스 터널링: VPS:8080 → localhost:8000 (호스트 네트워크)
+      - SSH_TUNNEL_PORT=8080:localhost:8000
+
+      # AutoSSH 설정
+      - AUTOSSH_GATETIME=0
+      - AUTOSSH_POLL=30
+    volumes:
+      # SSH 키 마운트
+      - ./secrets/ssh_key:/id_rsa:ro
+      - ./secrets/known_hosts:/known_hosts:ro
+
+  #############################################################################
+  # Frontend Service (React + Vite)
+  #############################################################################
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: soundroutine-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=${EXTERNAL_BASE_URL}/api
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  data:
