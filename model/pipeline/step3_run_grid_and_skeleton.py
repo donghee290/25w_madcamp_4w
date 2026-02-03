@@ -5,8 +5,7 @@ import argparse
 import json
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
-
+from typing import Any, Dict, List
 
 import sys
 # Add model dir to sys.path
@@ -15,27 +14,22 @@ sys.path.append(str(Path(__file__).parent.parent))
 from stage3_beat_grid.grid import GridConfig, build_grid
 from stage3_beat_grid.patterns.skeleton import SkeletonConfig, build_skeleton_events
 
-
 AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--pools_json", type=str, default="random", help="Path to pools json or 'random'")
+    
     p.add_argument("--out_dir", type=str, required=True)
-
     p.add_argument("--bpm", type=float, required=True)
     p.add_argument("--bars", type=int, default=4)
+    
+    # Restored Skeleton Inputs
+    p.add_argument("--style", type=str, default="rock", help="Music style for skeleton (rock, hiphop, house, etc)")
+    p.add_argument("--pools_json", type=str, required=False, help="Path to pools.json (required for sample selection)")
     p.add_argument("--seed", type=int, default=42)
 
-    p.add_argument("--motion_mode", type=str, default="B")        # A/B
-    p.add_argument("--motion_keep", type=int, default=6)          # 4~8
-    p.add_argument("--fill_prob", type=float, default=0.25)
-    p.add_argument("--texture", type=int, default=1)              # 1/0
-    p.add_argument("--style", type=str, default="rock")           # rock/house/hiphop
-
-    # render 관련 (필요하면 바꿔서 쓰세요)
-    p.add_argument("--sample_root", type=str, default="examples/input_samples")
+    # Render config (optional, maybe unused now if we don't render here)
     p.add_argument("--render_sr", type=int, default=44100)
 
     return p.parse_args()
@@ -99,80 +93,10 @@ def _jsonable(obj: Any) -> Any:
     return obj
 
 
-def _event_to_dict(e: Any) -> Dict[str, Any]:
-    """
-    events.py/skeleton.py 변경에도 최대한 안 깨지도록
-    가능한 필드를 폭넓게 받아서 표준 event dict로 맞춥니다.
-    """
-    # dict로 이미 왔다면 우선 그대로 쓰되, 키 이름만 표준화
-    if isinstance(e, dict):
-        d = dict(e)
-    elif is_dataclass(e):
-        d = asdict(e)
-    else:
-        # 일반 객체: attribute 기반으로 뽑기
-        d = {}
-        for k in ["bar", "step", "role", "sample_id", "vel", "dur_steps", "micro_offset_ms", "source", "filepath"]:
-            if hasattr(e, k):
-                d[k] = getattr(e, k)
-
-    # role enum/obj → str
-    role = d.get("role", None)
-    if role is not None and hasattr(role, "value"):
-        try:
-            d["role"] = role.value
-        except Exception:
-            d["role"] = str(role)
-
-    # 필수 키 기본값
-    d.setdefault("micro_offset_ms", 0.0)
-    d.setdefault("source", "skeleton")
-
-    # 타입 정리
-    if "bar" in d:
-        d["bar"] = int(d["bar"])
-    if "step" in d:
-        d["step"] = int(d["step"])
-    if "vel" in d:
-        d["vel"] = float(d["vel"])
-    if "dur_steps" in d:
-        d["dur_steps"] = int(d["dur_steps"])
-    if "micro_offset_ms" in d:
-        d["micro_offset_ms"] = float(d["micro_offset_ms"])
-
-    # sample_id는 string으로
-    if "sample_id" in d and d["sample_id"] is not None:
-        d["sample_id"] = str(d["sample_id"])
-
-    # filepath가 있으면 렌더가 더 편하지만, 없어도 render에서 sample_id로 lookup하게 둘 수 있음
-    if "filepath" in d and d["filepath"] is not None:
-        d["filepath"] = str(d["filepath"])
-
-    # 최종 jsonable 정리
-    return _jsonable(d)
-
-
-def _select_pools_path(pools_path_str: str) -> Path:
-    if not pools_path_str or pools_path_str.lower() == "random":
-        candidates = list(Path("outs/outs_role").glob("role_pools_*.json"))
-        if not candidates:
-            candidates = list(Path(".").glob("role_pools_*.json"))
-        if not candidates:
-            raise RuntimeError("No 'role_pools_*.json' found for random selection.")
-        import random
-        selected_pool = random.choice(candidates)
-        print(f"[INFO] Randomly selected pool: {selected_pool}")
-        return selected_pool
-    return Path(pools_path_str)
-
-
 def main() -> None:
     args = parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    pools_path = _select_pools_path(args.pools_json)
-    pools: Dict[str, Any] = json.loads(pools_path.read_text(encoding="utf-8"))
 
     # 1) grid
     gcfg = GridConfig(
@@ -196,54 +120,44 @@ def main() -> None:
         "t_step": _jsonable(grid.t_step),
     }
 
-    # 2) skeleton events
+    # 2) Skeleton Generation (Constraint)
+    pools = {}
+    if args.pools_json and Path(args.pools_json).exists():
+        pools = json.loads(Path(args.pools_json).read_text())
+    
+    # Default configs for now
     scfg = SkeletonConfig(
-        seed=int(args.seed),
+        seed=args.seed,
         steps_per_bar=16,
         num_bars=int(args.bars),
-        motion_mode=str(args.motion_mode),
-        motion_keep_per_bar=int(args.motion_keep),
-        fill_prob=float(args.fill_prob),
-        texture_enabled=bool(int(args.texture)),
-        pattern_style=str(args.style),
+        pattern_style=args.style,
+        fill_prob=0.3, 
+        texture_enabled=True
     )
-
-    events, chosen = build_skeleton_events(
-        pools, 
-        scfg, 
-        tstep=grid.tstep  # Pass float value for decay calculation
-    )
-
-    # events 직렬화 (변경된 events.py/skeleton.py를 최대한 흡수)
-    events_json: List[Dict[str, Any]] = [_event_to_dict(e) for e in events]
-
-    # 3) output numbering
+    
+    # Generate Reference Skeleton
+    # This logic creates the "Standard" pattern for the requested style
+    skel_events, chosen = build_skeleton_events(pools, scfg, tstep=grid.tstep)
+    
+    # 3) Output numbering
     ver = get_next_version(out_dir)
 
     base_grid = out_dir / f"grid_{ver}.json"
-    base_events = out_dir / f"event_grid_{ver}.json"
-    base_meta = out_dir / f"skeleton_meta_{ver}.json"
-    base_wav = out_dir / f"render_{ver}.wav"
-
+    skel_out = out_dir / f"skeleton_{ver}.json"
+    
+    # Write Grid
     base_grid.write_text(json.dumps(grid_json, ensure_ascii=False, indent=2), encoding="utf-8")
-    base_events.write_text(json.dumps(events_json, ensure_ascii=False, indent=2), encoding="utf-8")
-    base_meta.write_text(
-        json.dumps({"chosen_samples": _jsonable(chosen)}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    
+    # Write Skeleton (as Reference)
+    # We convert Event objects to list of dicts
+    skel_json = [_jsonable(e) for e in skel_events]
+    skel_out.write_text(json.dumps(skel_json, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("[DONE] grid + skeleton created")
+    print("[DONE] Grid & Skeleton setup complete")
     print(f" - ID: {ver}")
-    print(" - pools:", str(pools_path))
     print(" - grid:", str(base_grid))
-    print(" - events:", str(base_events))
-    print(" - meta:", str(base_meta))
-    print(" - num_events:", len(events_json))
-
-    # 4) Audio render skipped in Stage 3 (moved to Stage 7)
-    # if you really need it, import form stage7_render.audio_renderer
-    print("[INFO] Audio rendering skipped in Stage 3 (as requested).")
-
+    print(" - skeleton:", str(skel_out))
+    print(" - chosen:", chosen)
 
 if __name__ == "__main__":
     main()
