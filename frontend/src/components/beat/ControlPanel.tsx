@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
-import { Download, Settings, Sliders, Save, ChevronDown } from 'lucide-react';
 
 const ControlPanel = () => {
     const { config, updateConfig, regenerate, downloadUrl } = useProject();
