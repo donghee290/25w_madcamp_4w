@@ -119,7 +119,7 @@ const SoundMaterial = () => {
 };
 
 const GenerateButton = () => {
-    const { generateInitial, jobStatus, jobProgress, isConnected, uploadedFiles } = useProject();
+    const { generateBeat, jobStatus, jobProgress, isConnected, uploadedFiles } = useProject();
 
     const isProcessing = jobStatus === 'running';
     const hasFiles = uploadedFiles.length > 0;
@@ -131,7 +131,7 @@ const GenerateButton = () => {
     return (
         <button
             disabled={isDisabled}
-            onClick={generateInitial}
+            onClick={generateBeat}
             className={`w-full py-3 rounded-lg font-bold text-sm shadow-sm transition-all flex justify-center items-center gap-2
                 ${isDisabled
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
