@@ -208,9 +208,15 @@ def render_events(
         y = load_wav_mono(wav_path, target_sr)
 
         # duration 컷 (grid 기반)
+        # FIX: Percussive roles (CORE, ACCENT, MOTION, FILL) should be One-Shot (not gated by step duration)
+        # unless explicitly requested longer duration? For now, we assume simple beats.
+        # TEXTURE is usually gated.
+        is_percussive = role in ["CORE", "ACCENT", "MOTION", "FILL", "KICK", "SNARE", "HIHAT"]
+        
         max_len = int(round(dur_steps * tstep * target_sr)) if tstep > 0 else 0
-        if max_len > 0 and len(y) > max_len:
-            y = y[:max_len]
+        
+        if not is_percussive and max_len > 0 and len(y) > max_len:
+             y = y[:max_len]
 
         # TEXTURE: 짧은 샘플이면 해당 dur_steps 길이만큼 루프해서 깔기
         # (texture는 대개 배경음이라 "한 마디/여러 스텝 지속"이 자연스러움)
