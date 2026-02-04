@@ -66,7 +66,8 @@ export interface ProjectContextState {
     // Actions
     createBeat: () => Promise<void>;
     uploadFiles: (files: File[]) => Promise<void>;
-    generateBeat: () => Promise<void>;
+    removeFile: (filename: string) => Promise<void>;
+    generateBeat: (customName?: string) => Promise<void>;
     regenerate: (fromStage: number, params?: Partial<PipelineConfig>) => Promise<void>;
     updateConfig: (updates: Partial<PipelineConfig>) => Promise<void>;
     downloadUrl: (format?: string) => string;
