@@ -84,7 +84,7 @@ const BeatCanvas = () => {
             : 0;
 
         return (
-            <div key={barIndex} className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
+            <div key={barIndex} className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative overflow-hidden">
                 {/* Bar Header */}
                 <div className="flex items-center mb-3">
                     <span className="font-mono text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">
@@ -96,58 +96,64 @@ const BeatCanvas = () => {
                     )}
                 </div>
 
-                {/* Grid Layout */}
-                <div className="grid grid-cols-[80px_1fr] gap-4">
-                    {/* Role Labels Column */}
-                    <div className="flex flex-col gap-1 pt-6 text-right">
-                        {ROW_ORDER.map(role => (
-                            <div key={role} className="h-8 flex items-center justify-end">
-                                <span
-                                    className="px-2 py-0.5 text-[10px] font-bold rounded text-white shadow-sm"
-                                    style={{ backgroundColor: ROLE_COLORS[role] }}
-                                >
-                                    {role}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
+                {/* Grid Container */}
+                <div className="relative">
 
-                    {/* Timeline & Lanes Column */}
-                    <div className="relative">
+                    {/* Timeline Header */}
+                    <div className="flex h-8 mb-2">
+                        {/* Spacer for labels */}
+                        <div className="w-[80px] shrink-0 border-r border-transparent"></div>
+
                         {/* Steps Header */}
-                        <div className="flex h-6 mb-1 border-b border-gray-200">
+                        <div className="flex-1 flex">
                             {Array.from({ length: stepsPerBar }).map((_, i) => {
                                 const sub = i % 4;
                                 const beat = Math.floor(i / 4) + 1;
                                 const label = sub === 0 ? beat : sub === 1 ? 'e' : sub === 2 ? '&' : 'a';
                                 return (
-                                    <div key={i} className={`flex-1 flex items-center justify-center text-[10px] font-mono ${sub === 0 ? 'font-bold text-gray-800' : 'text-gray-400'}`}>
+                                    <div key={i} className={`flex-1 flex items-center justify-center text-[10px] font-mono border-l border-gray-100 ${sub === 0 ? 'font-bold text-gray-700' : 'text-gray-400'}`}>
                                         {label}
                                     </div>
                                 );
                             })}
                         </div>
+                    </div>
 
-                        {/* Playhead Overlay (Global for this bar) */}
-                        {isPlayheadInBar && (
-                            <div
-                                className="absolute top-7 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none transition-all duration-75 linear shadow-[0_0_8px_rgba(239,68,68,0.6)]"
-                                style={{ left: `${playheadOffsetPercent}%` }}
-                            />
-                        )}
+                    {/* Playhead Overlay (Global for this bar) */}
+                    {isPlayheadInBar && (
+                        <div
+                            className="absolute top-0 bottom-0 w-[2px] bg-red-500 z-50 pointer-events-none transition-all duration-75 linear shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                            style={{
+                                left: `calc(80px + (100% - 80px) * ${playheadOffsetPercent / 100})`,
+                                transform: 'translateX(-50%)' // Center exactly on the point
+                            }}
+                        />
+                    )}
 
-                        {/* Lanes Container */}
-                        <div className="flex flex-col gap-1 relative">
-                            {/* Vertical Grid Lines (Background) */}
-                            <div className="absolute inset-0 flex pointer-events-none z-0">
-                                {Array.from({ length: stepsPerBar }).map((_, i) => (
-                                    <div key={i} className={`flex-1 border-r ${i % 4 === 3 ? 'border-gray-200' : 'border-gray-50/50'}`}></div>
-                                ))}
-                            </div>
+                    {/* Lanes Container */}
+                    <div className="flex flex-col">
+                        {ROW_ORDER.map((role, idx) => (
+                            <div key={role} className={`flex h-12 border-b border-gray-100 ${idx === 0 ? 'border-t' : ''} hover:bg-gray-50 transition-colors`}>
+                                {/* Role Label */}
+                                <div className="w-[80px] shrink-0 flex items-center justify-end pr-3 border-r border-gray-100">
+                                    <span
+                                        className="px-2 py-1 text-[10px] font-bold rounded text-white shadow-sm tracking-wide"
+                                        style={{ backgroundColor: ROLE_COLORS[role] }}
+                                    >
+                                        {role}
+                                    </span>
+                                </div>
 
-                            {/* Event Rows */}
-                            {ROW_ORDER.map(role => (
-                                <div key={role} className="h-8 flex relative z-10">
+                                {/* Step Lane */}
+                                <div className="flex-1 flex relative">
+                                    {/* Vertical Grid Lines (Background for this row) */}
+                                    <div className="absolute inset-0 flex pointer-events-none z-0">
+                                        {Array.from({ length: stepsPerBar }).map((_, i) => (
+                                            <div key={i} className={`flex-1 border-r ${i % 4 === 3 ? 'border-gray-200' : 'border-gray-50'}`}></div>
+                                        ))}
+                                    </div>
+
+                                    {/* Notes */}
                                     {Array.from({ length: stepsPerBar }).map((_, stepOffset) => {
                                         const currentStep = startStep + stepOffset;
 
@@ -156,20 +162,17 @@ const BeatCanvas = () => {
                                             const eStart = Number(e.step);
                                             const eDur = Number((e as any).dur_steps || (e as any).duration || 1);
                                             const eEnd = eStart + eDur;
-
                                             const eRole = e.role ? e.role.toUpperCase() : '';
                                             return eRole === role && currentStep >= eStart && currentStep < eEnd;
                                         });
 
                                         return (
-                                            <div key={stepOffset} className="flex-1 p-0.5">
+                                            <div key={stepOffset} className="flex-1 p-1 z-10 relative">
                                                 {event && (
                                                     <div
-                                                        className="w-full h-full rounded shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                                                        className="w-full h-full rounded shadow-sm hover:scale-105 transition-all cursor-pointer ring-1 ring-black/5"
                                                         style={{
                                                             backgroundColor: ROLE_COLORS[role],
-                                                            opacity: 0.9,
-                                                            minHeight: '20px'
                                                         }}
                                                         title={`Vel: ${event.velocity}`}
                                                     />
@@ -178,8 +181,8 @@ const BeatCanvas = () => {
                                         );
                                     })}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -192,10 +195,10 @@ const BeatCanvas = () => {
     const visibleBarIndices = Array.from({ length: Math.max(0, endBarIdx - startBarIdx) }).map((_, i) => startBarIdx + i);
 
     return (
-        <div className="flex-1 bg-gray-50 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-8 text-gray-800">
             <div className="max-w-5xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
                         Beat Canvas
                     </h1>
 
@@ -217,7 +220,7 @@ const BeatCanvas = () => {
                         <button
                             onClick={prevPage}
                             disabled={currentPage === 0}
-                            className="p-2 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-2 rounded hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
@@ -231,7 +234,7 @@ const BeatCanvas = () => {
                         <button
                             onClick={nextPage}
                             disabled={currentPage >= totalPages - 1}
-                            className="p-2 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="p-2 rounded hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             <ChevronRight className="w-5 h-5" />
                         </button>
