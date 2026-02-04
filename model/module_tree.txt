@@ -15,10 +15,6 @@ model/
         step6_run_editor.py
         step7_run_render_final.py
     stage1_preprocess/
-        README.md
-        REPORT.md
-        REPORT_COMPARISON.md
-        USAGE.md
         __init__.py
         config.py
         analysis/
