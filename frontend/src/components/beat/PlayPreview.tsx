@@ -3,7 +3,7 @@ import { useProject } from '../../context/ProjectContext';
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
 const PlayPreview = () => {
-    const { grid, isConnected, downloadUrl, setPlaybackState } = useProject();
+    const { grid, isConnected, downloadUrl, playbackState, setPlaybackState } = useProject();
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -23,6 +23,22 @@ const PlayPreview = () => {
         }
     }, [isConnected, grid]);
 
+    // Sync with Context State (Remote Control)
+    useEffect(() => {
+        if (!audioRef.current) return;
+
+        // If context says playing but audio is paused -> play
+        if (playbackState.isPlaying && audioRef.current.paused) {
+            audioRef.current.play().catch(e => console.error("Remote play failed", e));
+            setIsPlaying(true);
+        }
+        // If context says paused but audio is playing -> pause
+        else if (!playbackState.isPlaying && !audioRef.current.paused) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+    }, [playbackState.isPlaying]);
+
     // Audio Events
     const togglePlay = () => {
         if (!audioRef.current) return;
@@ -31,10 +47,11 @@ const PlayPreview = () => {
         } else {
             audioRef.current.play().catch(e => console.error("Play failed", e));
         }
-        setIsPlaying(!isPlaying);
+        const newPlayingState = !isPlaying;
+        setIsPlaying(newPlayingState);
 
         // Sync to context immediately
-        setPlaybackState({ isPlaying: !isPlaying, currentTime, duration });
+        setPlaybackState((prev: { isPlaying: boolean; currentTime: number; duration: number }) => ({ ...prev, isPlaying: newPlayingState, currentTime, duration }));
     };
 
     const onTimeUpdate = () => {
@@ -44,14 +61,15 @@ const PlayPreview = () => {
             setCurrentTime(curr);
             setDuration(dur);
             // Sync to context
-            setPlaybackState({ isPlaying: !audioRef.current.paused, currentTime: curr, duration: dur });
+            // Note: We don't partial update here anymore to avoid race loops, or we just push time
+            setPlaybackState((prev: { isPlaying: boolean; currentTime: number; duration: number }) => ({ ...prev, currentTime: curr, duration: dur }));
         }
     };
 
     const handleEnded = () => {
         setIsPlaying(false);
         setCurrentTime(0);
-        setPlaybackState({ isPlaying: false, currentTime: 0, duration });
+        setPlaybackState((prev: { isPlaying: boolean; currentTime: number; duration: number }) => ({ ...prev, isPlaying: false, currentTime: 0, duration }));
     };
 
     const onLoadedMetadata = () => {
@@ -65,6 +83,7 @@ const PlayPreview = () => {
         if (audioRef.current) {
             audioRef.current.currentTime = time;
             setCurrentTime(time);
+            setPlaybackState((prev: { isPlaying: boolean; currentTime: number; duration: number }) => ({ ...prev, currentTime: time }));
         }
     };
 

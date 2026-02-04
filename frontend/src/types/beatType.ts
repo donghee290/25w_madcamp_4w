@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 export type RoleType = 'CORE' | 'ACCENT' | 'MOTION' | 'FILL' | 'TEXTURE';
 
 export interface SoundFile {
@@ -10,9 +11,10 @@ export interface SoundFile {
 }
 
 export interface GridEvent {
-    step: number;    // 0-based index in the grid (e.g. 0 to 127)
+    bar: number;     // 0-based bar index
+    step: number;    // 0-based step index within the bar (0-15)
     role: RoleType;
-    velocity: number; // 0-127
+    velocity: number; // 0-127 or 0-1
     duration: number; // in steps usually
     offset?: number;  // micro-timing
     sampleId?: string; // specific sample used
@@ -79,13 +81,13 @@ export interface ProjectContextState {
         currentTime: number;
         duration: number;
     };
-    setPlaybackState: (state: { isPlaying: boolean; currentTime: number; duration: number }) => void;
+    setPlaybackState: Dispatch<SetStateAction<{ isPlaying: boolean; currentTime: number; duration: number }>>;
 
     // Global Modals
     modalState: {
         type: 'PREVIEW' | 'DELETE' | null;
         data?: any; // File for preview, filename string for delete
     };
-    setModalState: (state: { type: 'PREVIEW' | 'DELETE' | null; data?: any }) => void;
+    setModalState: Dispatch<SetStateAction<{ type: 'PREVIEW' | 'DELETE' | null; data?: any }>>;
     setRolePools: (pools: Record<RoleType, string[]>) => void;
 }
