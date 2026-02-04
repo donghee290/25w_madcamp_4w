@@ -41,10 +41,51 @@ def main():
     p.add_argument("--project_name", type=str, default="project_001")
     p.add_argument("--bpm", type=float, default=120.0)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--style", type=str, default="rock", help="rock (kung-chi-ta-chi) or house")
+    p.add_argument("--style", type=str, default="auto", help="Music style (rock, house, funk, rnb, auto, etc)")
     args = p.parse_args()
     
     start_time = time.time()
+    
+    # --- Smart Style Selection Logic ---
+    def suggest_style_by_bpm(bpm: float) -> str:
+        """Recommend a style based on BPM ranges."""
+        import random
+        b = float(bpm)
+        
+        # 1. Slow (< 100): HipHop, Trap, R&B, Reggae
+        if b < 100:
+            candidates = ["hiphop", "trap", "rnb", "rock"]
+            weights    = [0.4,      0.3,    0.2,   0.1]
+            return random.choices(candidates, weights=weights, k=1)[0]
+            
+        # 2. Mid (100-115): Funk, Rock, Glitch? (Glitch not impl yet)
+        elif b < 115:
+            candidates = ["funk", "rock", "hiphop", "house"] # Slow house?
+            weights    = [0.4,    0.3,    0.2,      0.1]
+            return random.choices(candidates, weights=weights, k=1)[0]
+            
+        # 3. Fast (115-130): House, Techno, Disco
+        elif b < 130:
+            candidates = ["house", "techno", "funk", "rock"]
+            weights    = [0.4,     0.3,      0.2,    0.1]
+            return random.choices(candidates, weights=weights, k=1)[0]
+            
+        # 4. Very Fast (130+): DnB, Techno
+        else:
+            candidates = ["dnb", "techno", "trap"] # Fast trap?
+            weights    = [0.5,   0.3,      0.2]
+            return random.choices(candidates, weights=weights, k=1)[0]
+
+    # Resolving Style
+    chosen_style = args.style.lower()
+    
+    if chosen_style in ["auto", "random"]:
+        print(f"[pipeline] Style '{chosen_style}' requested. Detecting best fit for {args.bpm} BPM...")
+        chosen_style = suggest_style_by_bpm(args.bpm)
+        print(f"[pipeline] ==> Smart Recommendation: {chosen_style.upper()}")
+        
+    else:
+        print(f"\n[pipeline] Style explicitly selected: {chosen_style.upper()}")
     
     # 0. Output Setup
     output_root = PROJECT_ROOT / "outs" / args.project_name
@@ -89,7 +130,7 @@ def main():
     run_step("step3_run_grid_and_skeleton.py", [
         "--out_dir", str(dirs["s3"]),
         "--bpm", str(args.bpm),
-        "--style", str(args.style),
+        "--style", str(chosen_style),
         "--seed", str(args.seed),
         "--pools_json", str(pools_json)
     ])

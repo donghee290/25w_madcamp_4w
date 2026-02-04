@@ -135,8 +135,8 @@ def merge_events(best_events: list, skeleton_events: list) -> list:
         
     # Check Skeleton
     for s_evt in skeleton_events:
-        # Only enforce structural roles
-        if s_evt['role'] not in ['CORE', 'ACCENT', 'MOTION']:
+        # Enforce all structural roles + decorations
+        if s_evt['role'] not in ['CORE', 'ACCENT', 'MOTION', 'FILL', 'TEXTURE']:
             continue
             
         key = (s_evt['bar'], s_evt['step'], s_evt['role'])
