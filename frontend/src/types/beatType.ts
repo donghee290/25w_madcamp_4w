@@ -73,10 +73,18 @@ export interface ProjectContextState {
     downloadUrl: (format?: string) => string;
 
     // Playback Sync
+    // Playback Sync
     playbackState: {
         isPlaying: boolean;
         currentTime: number;
         duration: number;
     };
     setPlaybackState: (state: { isPlaying: boolean; currentTime: number; duration: number }) => void;
+
+    // Global Modals
+    modalState: {
+        type: 'PREVIEW' | 'DELETE' | null;
+        data?: any; // File for preview, filename string for delete
+    };
+    setModalState: (state: { type: 'PREVIEW' | 'DELETE' | null; data?: any }) => void;
 }

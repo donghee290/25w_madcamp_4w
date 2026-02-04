@@ -14,122 +14,154 @@ const ROLE_COLORS: Record<RoleType, string> = {
 const MAX_SLOTS = 5;
 
 const SoundMaterial = () => {
-    const { uploadedFiles, uploadFiles, removeFile, rolePools, generateBeat, jobStatus, jobProgress, isConnected } = useProject();
+    const { uploadedFiles, rolePools, generateBeat, jobStatus, jobProgress, isConnected, setModalState } = useProject();
 
     // Dynamic Slots State
-    // We start with 1 empty slot if no files
     const [emptySlots, setEmptySlots] = useState<number>(1);
     const [beatNameInput, setBeatNameInput] = useState<string>("Awesome Beat");
+    const [showLimitTooltip, setShowLimitTooltip] = useState(false);
 
-    // Sync empty slots to ensure total <= MAX_SLOTS
+    const [showMinTooltip, setShowMinTooltip] = useState(false);
+    const prevUploadedLength = useRef(uploadedFiles.length);
+
+    // Sync: Adjust empty slots based on upload/delete
     useEffect(() => {
-        const total = uploadedFiles.length + emptySlots;
-        if (total > MAX_SLOTS) {
-            setEmptySlots(Math.max(0, MAX_SLOTS - uploadedFiles.length));
-        } else if (total === 0 && uploadedFiles.length < MAX_SLOTS) {
-            // Always show at least one if possible? Or follow "New slot" logic only?
-            // User requested "New slot" button to add. 
-            // Let's ensure if 0 files and 0 slots, we default to 1 empty slot for better UX start.
-            if (uploadedFiles.length === 0) setEmptySlots(1);
+        if (uploadedFiles.length > prevUploadedLength.current) {
+            // Uploaded: Consume an empty slot
+            setEmptySlots(prev => Math.max(0, prev - 1));
+        } else if (uploadedFiles.length < prevUploadedLength.current) {
+            // Deleted: Free up an empty slot (replace the file)
+            setEmptySlots(prev => prev + 1);
         }
+        prevUploadedLength.current = uploadedFiles.length;
     }, [uploadedFiles.length]);
+
+    // Handle Removing Empty Slot
+    const handleRemoveEmptySlot = () => {
+        const total = uploadedFiles.length + emptySlots;
+        if (total > 1) {
+            setEmptySlots(prev => Math.max(0, prev - 1));
+        } else {
+            setShowMinTooltip(true);
+            setTimeout(() => setShowMinTooltip(false), 3000);
+        }
+    };
 
     const handleAddSlot = () => {
         if (uploadedFiles.length + emptySlots < MAX_SLOTS) {
             setEmptySlots(prev => prev + 1);
+        } else {
+            setShowLimitTooltip(true);
+            setTimeout(() => setShowLimitTooltip(false), 3000);
         }
     };
 
-    const handleRemoveFile = async (name: string) => {
-        await removeFile(name);
-        // After removing, we conceptually freed a slot.
-        // We might want to increase empty slots if we want to maintain the "slot" count UI behavior?
-        // Logic: 
-        // total files decreased by 1.
-        // if we want to keep slots consistent or just let the user add new one?
-        // User behavior: "I didn't like this file, I want to upload another".
-        // So yes, we should probably ensure an empty slot appears in its place implicitly or explicitly.
-        // Since `emptySlots` state is separate, reducing `uploadedFiles` length automatically increases the "available space" for empty slots?
-        // No, `useEffect` logic:
-        // if total > MAX, reduce empty.
-        // But if total reduces, we don't auto-increase empty.
-        // So we should manually add 1 to emptySlots to make it feel like "replacing".
-        setEmptySlots(prev => Math.min(MAX_SLOTS - (uploadedFiles.length - 1), prev + 1));
+    // --- Trigger Modals ---
+
+    // 1. Delete Flow
+    const initiateRemove = (name: string) => {
+        setModalState({ type: 'DELETE', data: name });
     };
 
-    const handleRemoveEmptySlot = () => {
-        setEmptySlots(prev => Math.max(0, prev - 1));
-    }
+    // 2. Upload Flow (Preview)
+    const initiateUpload = (files: File[]) => {
+        if (files.length > 0) {
+            setModalState({ type: 'PREVIEW', data: files[0] });
+        }
+    };
 
 
     return (
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full font-sans">
-            <div className="p-5 border-b border-gray-100">
-                <div className="flex justify-between items-center mb-1">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        Sound Material
-                    </h2>
-                    <button
-                        onClick={handleAddSlot}
-                        disabled={uploadedFiles.length + emptySlots >= MAX_SLOTS}
-                        className={`text-sm font-medium underline underline-offset-2 
-                            ${uploadedFiles.length + emptySlots >= MAX_SLOTS ? 'text-gray-300 cursor-not-allowed' : 'text-black hover:text-gray-700'}
-                        `}
-                    >
-                        New slot
-                    </button>
-                </div>
-                <p className="text-xs text-gray-500 leading-relaxed mt-1">
-                    Supported formats are m4a, mp3, wav, webm.<br />
-                    You can upload up to 5 sounds.<br />
-                    • One-shot sounds: 3+ recommended.<br />
-                    • Long sounds: Automatically split.
-                </p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {/* Uploaded Files (Filled Slots) */}
-                {uploadedFiles.map((file) => (
-                    <FilledSlot
-                        key={file.id}
-                        file={file}
-                        rolePools={rolePools}
-                        onRemove={() => handleRemoveFile(file.name)}
-                    />
-                ))}
-
-                {/* Empty Slots */}
-                {Array.from({ length: emptySlots }).map((_, i) => (
-                    <EmptySlot
-                        key={`empty-${i}`}
-                        onUpload={uploadFiles}
-                        onClose={handleRemoveEmptySlot}
-                    />
-                ))}
-            </div>
-
-            <div className="p-5 bg-white border-t border-gray-100">
-                <div className="mb-4">
-                    <label className="block text-lg font-bold mb-2">Beat Name</label>
-                    <input
-                        type="text"
-                        value={beatNameInput}
-                        onChange={(e) => setBeatNameInput(e.target.value)}
-                        className="w-full border-2 border-black rounded-lg px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                        placeholder="My Awesome Beat"
-                    />
+        <>
+            <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full font-sans">
+                <div className="p-5 border-b border-gray-100">
+                    <div className="flex justify-between items-center mb-1">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            Sound Material
+                        </h2>
+                        <div className="relative">
+                            <button
+                                onClick={handleAddSlot}
+                                className={`text-sm font-medium underline underline-offset-2 text-black hover:text-gray-700`}
+                            >
+                                New slot
+                            </button>
+                            {showLimitTooltip && (
+                                <div className="absolute top-8 right-0 z-50 w-max bg-white border-2 border-black rounded-full px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200">
+                                    <p className="text-sm font-bold text-black whitespace-nowrap">
+                                        You can upload up to 5 audio files.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        {/* Minimum Slot Tooltip (Global relative to header or slot?) 
+                            Actually, let's put it near the slot or just reuse global header tooltip area?
+                            Let's put it here for simplicity sharing position relative to header? 
+                            Or near the slot itself? 
+                            The user asked for a tooltip.
+                        */}
+                        <div className="relative">
+                            {showMinTooltip && (
+                                <div className="absolute top-8 right-0 z-50 w-max bg-white border-2 border-black rounded-full px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200">
+                                    <p className="text-sm font-bold text-black whitespace-nowrap">
+                                        You need at least one audio file.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed mt-1">
+                        Supported formats are m4a, mp3, wav, webm.<br />
+                        You can upload up to 5 sounds.<br />
+                        • One-shot sounds: 3+ recommended.<br />
+                        • Long sounds: Automatically split.
+                    </p>
                 </div>
 
-                <GenerateButton
-                    beatName={beatNameInput}
-                    generateBeat={generateBeat}
-                    jobStatus={jobStatus}
-                    jobProgress={jobProgress}
-                    isConnected={isConnected}
-                    hasFiles={uploadedFiles.length > 0}
-                />
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {/* Uploaded Files (Filled Slots) */}
+                    {uploadedFiles.map((file) => (
+                        <FilledSlot
+                            key={file.id}
+                            file={file}
+                            rolePools={rolePools}
+                            onRemove={() => initiateRemove(file.name)}
+                        />
+                    ))}
+
+                    {/* Empty Slots */}
+                    {Array.from({ length: emptySlots }).map((_, i) => (
+                        <EmptySlot
+                            key={`empty-${i}`}
+                            onUpload={initiateUpload}
+                            onClose={handleRemoveEmptySlot}
+                        />
+                    ))}
+                </div>
+
+                <div className="p-5 bg-white border-t border-gray-100">
+                    <div className="mb-4">
+                        <label className="block text-lg font-bold mb-2">Beat Name</label>
+                        <input
+                            type="text"
+                            value={beatNameInput}
+                            onChange={(e) => setBeatNameInput(e.target.value)}
+                            className="w-full border-2 border-black rounded-lg px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            placeholder="My Awesome Beat"
+                        />
+                    </div>
+
+                    <GenerateButton
+                        beatName={beatNameInput}
+                        generateBeat={generateBeat}
+                        jobStatus={jobStatus}
+                        jobProgress={jobProgress}
+                        isConnected={isConnected}
+                        hasFiles={uploadedFiles.length > 0}
+                    />
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 
@@ -189,11 +221,9 @@ const EmptySlot = ({ onUpload, onClose }: { onUpload: (f: File[]) => void, onClo
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             onUpload(Array.from(e.target.files));
-            // Close this empty slot effectively by consuming it?
-            // Parent handles logic: if upload succeeds, uploadedFiles increases, 
-            // useEffect will reduce emptySlots if over max, or we manually reduce?
-            // We should manually trigger slot reduction if we want 1-to-1 swap.
-            onClose();
+            // Do NOT call onClose() here. 
+            // The slot will be conceptually "filled" when the upload is confirmed and uploadedFiles changes.
+            // If we close it now, it disappears while the popup is open, which is confusing.
         }
     };
 
@@ -217,10 +247,20 @@ const EmptySlot = ({ onUpload, onClose }: { onUpload: (f: File[]) => void, onClo
             };
 
             mediaRecorder.onstop = () => {
-                const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-                const file = new File([blob], `recording_${Date.now()}.webm`, { type: 'audio/webm' });
+                const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+                const blob = new Blob(chunksRef.current, { type: mimeType });
+
+                // Determine extension from mimeType
+                let ext = 'webm';
+                if (mimeType.includes('mp4')) ext = 'm4a';
+                if (mimeType.includes('ogg')) ext = 'ogg';
+
+                const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: mimeType });
+
+                // Instead of onUpload directly, we pass it up.
+                // onUpload expects File[].
                 onUpload([file]);
-                onClose();
+                // removed onClose();
 
                 // Stop tracks
                 stream.getTracks().forEach(track => track.stop());
@@ -242,7 +282,7 @@ const EmptySlot = ({ onUpload, onClose }: { onUpload: (f: File[]) => void, onClo
     };
 
     return (
-        <div className="bg-white border-2 border-black rounded-lg p-2.5 flex items-center justify-between shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+        <div className="bg-white border-2 border-black rounded-lg p-2.5 flex items-center justify-between shadow-[2px_2px_0px_rgba(0,0,0,0.1)] group">
             <span className="text-sm text-gray-400 font-medium ml-2">Upload a sound.</span>
 
             <div className="flex items-center gap-2">
@@ -276,15 +316,14 @@ const EmptySlot = ({ onUpload, onClose }: { onUpload: (f: File[]) => void, onClo
                         <Circle className="w-3 h-3 text-red-500 fill-current" />
                     )}
                 </button>
+                <button
+                    onClick={onClose}
+                    className="text-gray-300 hover:text-black transition-colors"
+                    title="Remove Slot"
+                >
+                    <X className="w-4 h-4" />
+                </button>
             </div>
-
-            {/* Hidden Close for empty slot? Design implies slots are persistent until filled or removed?
-                 The design shows simple rows. Let's keep it simple.
-                 If user wants to remove an empty slot, maybe we don't need a specific button inside?
-                 The design doesn't explicitly show an X for empty slots.
-                 But user said "New slot" creates one. 
-                 I'll add a tiny X if needed, but for now sticking to design image.
-             */}
         </div>
     )
 }

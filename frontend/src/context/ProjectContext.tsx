@@ -47,6 +47,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         duration: 0
     });
 
+    // Global Modals
+    const [modalState, setModalState] = useState<{ type: 'PREVIEW' | 'DELETE' | null; data?: any }>({
+        type: null,
+        data: null
+    });
+
     // Polling ref
     const pollInterval = useRef<number | null>(null);
 
@@ -253,7 +259,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         downloadUrl,
 
         playbackState,
-        setPlaybackState
+        setPlaybackState,
+
+        modalState,
+        setModalState
     };
 
     return (
