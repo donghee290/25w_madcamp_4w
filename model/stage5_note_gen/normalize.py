@@ -139,7 +139,12 @@ def normalize_notes_to_event_grid(
         k = int(k) % grid.steps_per_bar
 
         vel01 = max(0.0, min(1.0, velocity / 127.0))
-        dur_steps = dur_steps_from_times(grid, start, end)
+        
+        if role == "TEXTURE":
+            # Force Texture to be a full bar for continuous pad sound
+            dur_steps = grid.steps_per_bar
+        else:
+            dur_steps = dur_steps_from_times(grid, start, end)
 
         sid = selector.pick(role)
         filepath = selector.get_filepath(sid)
