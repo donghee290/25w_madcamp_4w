@@ -35,11 +35,25 @@ export interface PipelineConfig {
 }
 
 // Maps to the backend ProjectState but cleaned up for UI
+export interface JobStatus {
+    job_id: string;
+    beat_name: string; // Renamed from project_name
+    status: 'running' | 'completed' | 'failed';
+    progress: string;
+    result?: unknown;
+    error?: string;
+    created_at: number;
+}
+
 export interface ProjectContextState {
-    projectName: string;
+    beatName: string;
     isConnected: boolean;
     jobStatus: 'idle' | 'running' | 'completed' | 'failed';
     jobProgress: string;
+
+    // Operational Flags
+    isUploading: boolean;
+    isGenerating: boolean;
 
     // Data
     config: PipelineConfig;
@@ -50,9 +64,9 @@ export interface ProjectContextState {
     rolePools: Record<RoleType, string[]> | null;
 
     // Actions
-    createProject: () => Promise<void>;
+    createBeat: () => Promise<void>;
     uploadFiles: (files: File[]) => Promise<void>;
-    generateInitial: () => Promise<void>;
+    generateBeat: () => Promise<void>;
     regenerate: (fromStage: number, params?: Partial<PipelineConfig>) => Promise<void>;
     updateConfig: (updates: Partial<PipelineConfig>) => Promise<void>;
     downloadUrl: (format?: string) => string;

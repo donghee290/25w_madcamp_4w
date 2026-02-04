@@ -82,31 +82,31 @@ class SoundRoutineModel:
 
     # ---- State Management ----
 
-    def _get_project_dir(self, project_name: str) -> Path:
-        return self.outs_root / project_name
+    def _get_project_dir(self, beat_name: str) -> Path:
+        return self.outs_root / beat_name
 
-    def _get_state_path(self, project_name: str) -> Path:
-        return self._get_project_dir(project_name) / "state.json"
+    def _get_state_path(self, beat_name: str) -> Path:
+        return self._get_project_dir(beat_name) / "state.json"
 
-    def get_state(self, project_name: str) -> Dict[str, Any]:
+    def get_state(self, beat_name: str) -> Dict[str, Any]:
         """Reads state.json for the project."""
-        p = self._get_state_path(project_name)
+        p = self._get_state_path(beat_name)
         if not p.exists():
             return {}
         try:
             with open(p, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to read state.json for {project_name}: {e}")
+            logger.error(f"Failed to read state.json for {beat_name}: {e}")
             return {}
 
-    def update_state(self, project_name: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    def update_state(self, beat_name: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Updates specific keys in state.json and saves it."""
-        current = self.get_state(project_name)
+        current = self.get_state(beat_name)
         current.update(updates)
         current["updated_at"] = time.time()
 
-        p = self._get_state_path(project_name)
+        p = self._get_state_path(beat_name)
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "w", encoding="utf-8") as f:
             json.dump(current, f, indent=2, ensure_ascii=False)
@@ -117,12 +117,13 @@ class SoundRoutineModel:
     def start_job(self, func, *args, **kwargs) -> str:
         """Starts a background thread for the given function and returns a job_id."""
         job_id = str(uuid.uuid4())
-        project_name = kwargs.get("project_name", "unknown")
+        beat_name = kwargs.get("project_name") or kwargs.get("beat_name") or "unknown"
 
         with self._job_lock:
             self._jobs[job_id] = JobInfo(
                 job_id=job_id,
-                project_name=project_name,
+                project_name=beat_name, # Maintain internal field for now or rename dataclass too? 
+                # Rename dataclass field for consistency
                 status="running",
                 progress="Starting...",
             )
@@ -155,7 +156,7 @@ class SoundRoutineModel:
                 return None
             return {
                 "job_id": job.job_id,
-                "project_name": job.project_name,
+                "beat_name": job.project_name, # Expose as beat_name
                 "status": job.status,
                 "progress": job.progress,
                 "result": job.result,
@@ -163,13 +164,13 @@ class SoundRoutineModel:
                 "created_at": job.created_at,
             }
 
-    def _update_job_progress(self, project_name: str, progress: str):
+    def _update_job_progress(self, beat_name: str, progress: str):
         # Find active job for this project (simple approximation)
         # In a real system, we'd pass job_id down.
         # For MVP, we just log it or update most recent running job for project
         with self._job_lock:
             for job in self._jobs.values():
-                if job.project_name == project_name and job.status == "running":
+                if job.project_name == beat_name and job.status == "running":
                     job.progress = progress
 
     # ---- Pipeline Execution ----
@@ -177,7 +178,7 @@ class SoundRoutineModel:
     def run_pipeline(
         self,
         input_dir: Path,
-        project_name: str = "project_001",
+        project_name: str = "beat_001", 
         bpm: float = 120.0,
         seed: int = 42,
         style: str = "rock",
@@ -189,8 +190,9 @@ class SoundRoutineModel:
         Updates state.json throughout the process.
         This is SYNCHRONOUS (blocks).
         """
+        beat_name = project_name
         # 1. Initialize State
-        self.update_state(project_name, {
+        self.update_state(beat_name, {
             "uploads_dir": str(input_dir),
             "config": {
                 "bpm": bpm,
@@ -202,11 +204,11 @@ class SoundRoutineModel:
         })
 
         # 2. Run from Stage 1
-        return self.run_from_stage(project_name, from_stage=1)
+        return self.run_from_stage(beat_name, from_stage=1)
 
     def run_from_stage(
         self,
-        project_name: str,
+        project_name: str, # Should rename this arg too but handle kwargs
         from_stage: int,
         config_overrides: Optional[Dict] = None
     ) -> Dict:
@@ -214,16 +216,18 @@ class SoundRoutineModel:
         Executes pipeline starting from `from_stage`.
         Reads inputs from `state.json` and updates it after each step.
         """
+        beat_name = project_name # Alias for local use
+        
         start_time = time.time()
-        project_dir = self._get_project_dir(project_name)
+        project_dir = self._get_project_dir(beat_name)
         project_dir.mkdir(parents=True, exist_ok=True)
 
         # Merge config
-        state = self.get_state(project_name)
+        state = self.get_state(beat_name)
         config = state.get("config", {})
         if config_overrides:
             config.update(config_overrides)
-            self.update_state(project_name, {"config": config})
+            self.update_state(beat_name, {"config": config})
 
         # Parameters
         bpm = float(config.get("bpm", 120.0))
@@ -247,7 +251,7 @@ class SoundRoutineModel:
 
         # ---- Stage 1: Preprocess ----
         if from_stage <= 1:
-            self._update_job_progress(project_name, "Running Stage 1: Preprocessing...")
+            self._update_job_progress(beat_name, "Running Stage 1: Preprocessing...")
             uploads_dir = state.get("uploads_dir")
             if not uploads_dir:
                 # If run_pipeline wasn't called, uploads_dir might be missing.
@@ -263,11 +267,11 @@ class SoundRoutineModel:
                 "--out_dir", str(dirs["s1"]),
             ])
             latest_s1 = _get_latest_stage_dir(dirs["s1"], "stage1_")
-            state = self.update_state(project_name, {"latest_s1_dir": str(latest_s1)})
+            state = self.update_state(beat_name, {"latest_s1_dir": str(latest_s1)})
 
         # ---- Stage 2: Role Assignment ----
         if from_stage <= 2:
-            self._update_job_progress(project_name, "Running Stage 2: Role Assignment...")
+            self._update_job_progress(beat_name, "Running Stage 2: Role Assignment...")
             latest_s1 = state.get("latest_s1_dir")
             if not latest_s1:
                 latest_s1 = str(_get_latest_stage_dir(dirs["s1"], "stage1_"))
@@ -278,11 +282,11 @@ class SoundRoutineModel:
                 "--limit", "0",
             ])
             pools_json = _get_latest_file(dirs["s2"], "role_pools_*.json")
-            state = self.update_state(project_name, {"latest_pools_json": str(pools_json)})
+            state = self.update_state(beat_name, {"latest_pools_json": str(pools_json)})
 
         # ---- Stage 3: Grid & Skeleton ----
         if from_stage <= 3:
-            self._update_job_progress(project_name, "Running Stage 3: Grid & Skeleton...")
+            self._update_job_progress(beat_name, "Running Stage 3: Grid & Skeleton...")
             pools_json = state.get("latest_pools_json")
             if not pools_json:
                 # Try finding it if state is missing
@@ -301,14 +305,14 @@ class SoundRoutineModel:
             except FileNotFoundError:
                 skeleton_json = _get_latest_file(dirs["s3"], "event_grid_*.json")
 
-            state = self.update_state(project_name, {
+            state = self.update_state(beat_name, {
                 "latest_grid_json": str(grid_json),
                 "latest_skeleton_json": str(skeleton_json)
             })
 
         # ---- Stage 4: Transformer Gen ----
         if from_stage <= 4:
-            self._update_job_progress(project_name, "Running Stage 4: AI Generation...")
+            self._update_job_progress(beat_name, "Running Stage 4: AI Generation...")
             grid_json = state.get("latest_grid_json")
             skeleton_json = state.get("latest_skeleton_json")
             pools_json = state.get("latest_pools_json")
@@ -350,11 +354,11 @@ class SoundRoutineModel:
                 ])
             
             notes_json = _get_latest_file(dirs["s4"], "event_grid_transformer_*.json")
-            state = self.update_state(project_name, {"latest_transformer_json": str(notes_json)})
+            state = self.update_state(beat_name, {"latest_transformer_json": str(notes_json)})
 
         # ---- Stage 5: Note & Layout ----
         if from_stage <= 5:
-            self._update_job_progress(project_name, "Running Stage 5: Arrangement...")
+            self._update_job_progress(beat_name, "Running Stage 5: Arrangement...")
             grid_json = state.get("latest_grid_json")
             notes_json = state.get("latest_transformer_json")
             pools_json = state.get("latest_pools_json")
@@ -385,14 +389,14 @@ class SoundRoutineModel:
             except FileNotFoundError:
                 pass
             
-            state = self.update_state(project_name, {
+            state = self.update_state(beat_name, {
                 "latest_event_grid_json": str(final_events),
                 "latest_grid_json": str(grid_json) # Update grid if expanded
             })
 
         # ---- Stage 6: Editor ----
         if from_stage <= 6:
-            self._update_job_progress(project_name, "Running Stage 6: Editor...")
+            self._update_job_progress(beat_name, "Running Stage 6: Editor...")
             grid_json = state.get("latest_grid_json")
             event_grid = state.get("latest_event_grid_json")
             sample_root = state.get("latest_s1_dir")
@@ -411,11 +415,11 @@ class SoundRoutineModel:
                 "--render_preview", "1",
             ])
             editor_events = _get_latest_file(dirs["s6"], "event_grid_*.json")
-            state = self.update_state(project_name, {"latest_editor_json": str(editor_events)})
+            state = self.update_state(beat_name, {"latest_editor_json": str(editor_events)})
 
         # ---- Stage 7: Render Final ----
         if from_stage <= 7:
-            self._update_job_progress(project_name, "Running Stage 7: Rendering...")
+            self._update_job_progress(beat_name, "Running Stage 7: Rendering...")
             grid_json = state.get("latest_grid_json")
             editor_events = state.get("latest_editor_json")
             sample_root = state.get("latest_s1_dir")
@@ -425,7 +429,7 @@ class SoundRoutineModel:
             if not editor_events: editor_events = str(_get_latest_file(dirs["s6"], "event_grid_*.json"))
             if not sample_root: sample_root = str(_get_latest_stage_dir(dirs["s1"], "stage1_"))
 
-            name = f"{project_name}_final"
+            name = f"{beat_name}_final"
             _run_step(self.project_root, self.pipeline_dir, "step7_run_render_final.py", [
                 "--grid_json", str(grid_json),
                 "--event_grid_json", str(editor_events),
@@ -437,7 +441,7 @@ class SoundRoutineModel:
             mp3_path = (dirs["s7"] / f"{name}.mp3").resolve()
             wav_path = (dirs["s7"] / f"{name}.wav").resolve()
             
-            self.update_state(project_name, {
+            self.update_state(beat_name, {
                 "latest_mp3": str(mp3_path),
                 "latest_wav": str(wav_path)
             })
@@ -447,7 +451,7 @@ class SoundRoutineModel:
         latest_wav = state.get("latest_wav", "")
         
         return {
-            "project_name": project_name,
+            "beat_name": beat_name,
             "bpm": bpm,
             "seed": seed,
             "style": style,
@@ -457,14 +461,14 @@ class SoundRoutineModel:
             "elapsed_sec": elapsed
         }
 
-    def convert_output(self, project_name: str, kind: str) -> Path:
+    def convert_output(self, beat_name: str, kind: str) -> Path:
         """
         Returns the path to the requested audio format.
         Used for on-demand download/preview.
         valid kinds: mp3, wav, flac, ogg, m4a
         """
         # For now, we only trust what's in state or what we can find in s7
-        state = self.get_state(project_name)
+        state = self.get_state(beat_name)
         
         # 1. Check if we already have it in state
         # e.g. state["latest_mp3"], state["latest_wav"]
@@ -486,7 +490,7 @@ class SoundRoutineModel:
                           return candidates_wav[0]
 
         try:
-            latest = self.get_latest_output(project_name)
+            latest = self.get_latest_output(beat_name)
             path_str = latest.get(f"{kind}_path")
             if path_str:
                 p = Path(path_str)
@@ -506,20 +510,20 @@ class SoundRoutineModel:
         
         raise FileNotFoundError(f"Could not find or convert output for {kind}")
 
-    def get_latest_output(self, project_name: str) -> Dict:
+    def get_latest_output(self, beat_name: str) -> Dict:
         # Prefer state.json
-        state = self.get_state(project_name)
+        state = self.get_state(beat_name)
         if state.get("latest_mp3") and Path(state["latest_mp3"]).exists():
              return {
-                "project_name": project_name,
+                "beat_name": beat_name,
                 "mp3_path": state["latest_mp3"],
                 "wav_path": state.get("latest_wav", ""),
                 "state": state
             }
             
         # Fallback to old glob method if state is missing
-        project_name = project_name.strip()
-        output_root = (self.outs_root / project_name).resolve()
+        beat_name = beat_name.strip()
+        output_root = (self.outs_root / beat_name).resolve()
         final_dir = output_root / "7_final"
         if not final_dir.exists():
             raise FileNotFoundError(f"final dir not found: {final_dir}")
@@ -532,7 +536,7 @@ class SoundRoutineModel:
         latest_wav = latest_mp3.with_suffix(".wav")
 
         return {
-            "project_name": project_name,
+            "beat_name": beat_name,
             "mp3_path": str(latest_mp3.resolve()),
             "wav_path": str(latest_wav.resolve()),
             "final_dir": str(final_dir.resolve()),

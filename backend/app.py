@@ -39,33 +39,33 @@ def create_app() -> Flask:
         })
 
     # ===============================================================
-    # NEW API ENDPOINTS (Project-based & Step-by-step)
+    # NEW API ENDPOINTS (Beat-based & Step-by-step)
     # ===============================================================
-
-    @app.post("/api/projects")
-    def create_project():
-        """Creates a new project (empty state)."""
+    
+    @app.post("/api/beats")
+    def create_beat():
+        """Creates a new beat (empty state)."""
         data = request.json or {}
         # Use timestamp for easy identification during testing
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        project_name = data.get("project_name") or f"project_{timestamp}"
+        beat_name = data.get("beat_name") or f"beat_{timestamp}"
         
         # Init state
         try:
-            app.model.update_state(project_name, {"created_at": str(uuid.uuid1())}) # type: ignore
+            app.model.update_state(beat_name, {"created_at": str(uuid.uuid1())}) # type: ignore
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
             
-        return jsonify({"ok": True, "project_name": project_name})
+        return jsonify({"ok": True, "beat_name": beat_name})
 
-    @app.post("/api/projects/<project_name>/upload")
-    def upload_files(project_name: str):
+    @app.post("/api/beats/<beat_name>/upload")
+    def upload_files(beat_name: str):
         """Uploads files and updates state.json."""
         files = request.files.getlist("audio")
         if not files:
             return jsonify({"ok": False, "error": "No audio files"}), 400
 
-        upload_dir = DEFAULT_OUTS_DIR / project_name / "uploads"
+        upload_dir = DEFAULT_OUTS_DIR / beat_name / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         saved = []
@@ -83,11 +83,11 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "No valid files saved"}), 400
 
         # Update state with uploads_dir
-        app.model.update_state(project_name, {"uploads_dir": str(upload_dir)}) # type: ignore
+        app.model.update_state(beat_name, {"uploads_dir": str(upload_dir)}) # type: ignore
         return jsonify({"ok": True, "count": len(saved)})
 
-    @app.post("/api/projects/<project_name>/generate/initial")
-    def generate_initial(project_name: str):
+    @app.post("/api/beats/<beat_name>/generate/initial")
+    def generate_initial(beat_name: str):
         """Runs the full pipeline (1-7) as a job."""
         data = request.json or {}
         # Allows optional config overrides
@@ -100,21 +100,21 @@ def create_app() -> Flask:
         }
         
         # Save config first
-        app.model.update_state(project_name, {"config": config}) # type: ignore
+        app.model.update_state(beat_name, {"config": config}) # type: ignore
         
         # Start job (runs full pipeline from stage 1)
         job_id = app.model.start_job( # type: ignore
             app.model.run_from_stage, # type: ignore
-            project_name=project_name,
+            project_name=beat_name, # Internal method might still use project_name arg for now, or we allow kwargs
             from_stage=1,
             config_overrides=config
         )
         return jsonify({"ok": True, "job_id": job_id})
 
-    @app.get("/api/projects/<project_name>/state")
-    def get_project_state(project_name: str):
+    @app.get("/api/beats/<beat_name>/state")
+    def get_beat_state(beat_name: str):
         """Returns the current state.json content, plus active grid/pool data."""
-        state = app.model.get_state(project_name) # type: ignore
+        state = app.model.get_state(beat_name) # type: ignore
         
         # Inject Grid Content if path exists
         grid_path = state.get("latest_grid_json")
@@ -191,24 +191,24 @@ def create_app() -> Flask:
 
         return jsonify({"ok": True, "state": state})
 
-    @app.patch("/api/projects/<project_name>/config")
-    def update_config(project_name: str):
+    @app.patch("/api/beats/<beat_name>/config")
+    def update_config(beat_name: str):
         """Updates configuration in state.json."""
         data = request.json or {}
         # We assume data contains keys like bpm, style, etc.
         # Check current state first
-        state = app.model.get_state(project_name) # type: ignore
+        state = app.model.get_state(beat_name) # type: ignore
         current_config = state.get("config", {})
         current_config.update(data)
         
-        app.model.update_state(project_name, {"config": current_config}) # type: ignore
+        app.model.update_state(beat_name, {"config": current_config}) # type: ignore
         return jsonify({"ok": True, "config": current_config})
 
-    @app.post("/api/projects/<project_name>/regenerate")
-    def regenerate(project_name: str):
+    @app.post("/api/beats/<beat_name>/regenerate")
+    def regenerate(beat_name: str):
         """
         Partial re-execution loop.
-        body: { "from_stage": 3, "overrides": {...} }
+        body: { "from_stage": 3, "params": {...} }
         """
         data = request.json or {}
         from_stage = int(data.get("from_stage", 1))
@@ -217,7 +217,7 @@ def create_app() -> Flask:
         # Start job
         job_id = app.model.start_job( # type: ignore
             app.model.run_from_stage, # type: ignore
-            project_name=project_name,
+            project_name=beat_name,
             from_stage=from_stage,
             config_overrides=overrides
         )
@@ -241,7 +241,7 @@ def create_app() -> Flask:
         Blocks until finished (SYNCHRONOUS for backward compat).
         """
         # ---- params
-        project_name = (request.form.get("project_name") or "project_001").strip()
+        beat_name = (request.form.get("beat_name") or request.form.get("project_name") or "beat_001").strip()
         bpm = float(request.form.get("bpm") or 120.0)
         seed = int(request.form.get("seed") or 42)
         style = (request.form.get("style") or "rock").strip()
@@ -252,7 +252,7 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "No audio files. Use form-data key: audio"}), 400
 
         # ---- write input_dir
-        input_dir = DEFAULT_OUTS_DIR / project_name / "uploads"
+        input_dir = DEFAULT_OUTS_DIR / beat_name / "uploads"
         input_dir.mkdir(parents=True, exist_ok=True)
 
         saved = []
@@ -271,14 +271,9 @@ def create_app() -> Flask:
 
         # ---- run pipeline (Blocking)
         try:
-            # We call run_pipeline which is now a wrapper around run_from_stage(1)
-            # This calls run_from_stage SYNCHRONOUSLY inside model_loader if we use the old RunPipeline method?
-            # actually app.model.run_pipeline in my new code calls run_from_stage directly 
-            # and returns the dict result. It does NOT spawn a thread.
-            
             result = app.model.run_pipeline( # type: ignore
                 input_dir=input_dir,
-                project_name=project_name,
+                project_name=beat_name, # Model still uses project_name internally? I will check model_loader.py next.
                 bpm=bpm,
                 seed=seed,
                 style=style,
@@ -288,16 +283,16 @@ def create_app() -> Flask:
 
         return jsonify({"ok": True, "result": result})
 
-    @app.get("/api/projects/<project_name>/latest")
-    def latest(project_name: str):
+    @app.get("/api/beats/<beat_name>/latest")
+    def latest(beat_name: str):
         try:
-            result = app.model.get_latest_output(project_name)  # type: ignore[attr-defined]
+            result = app.model.get_latest_output(beat_name)  # type: ignore[attr-defined]
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 404
         return jsonify({"ok": True, "result": result})
 
-    @app.get("/api/projects/<project_name>/download")
-    def download(project_name: str):
+    @app.get("/api/beats/<beat_name>/download")
+    def download(beat_name: str):
         kind = (request.args.get("kind") or "mp3").lower().strip()
         # Allow common audio formats
         if kind not in {"mp3", "wav", "flac", "ogg", "m4a"}:
@@ -305,8 +300,8 @@ def create_app() -> Flask:
 
         try:
             # On-demand conversion
-            file_path = app.model.convert_output(project_name, kind) # type: ignore
-            print(f"[DEBUG] Serving {file_path} for {project_name} ({kind})")
+            file_path = app.model.convert_output(beat_name, kind) # type: ignore
+            print(f"[DEBUG] Serving {file_path} for {beat_name} ({kind})")
         except Exception as e:
             print(f"[DEBUG] Download error: {e}")
             return jsonify({"ok": False, "error": str(e)}), 404

@@ -11,13 +11,13 @@
     - 200 OK: 조회/성공
     - 201 Created: 생성 성공
     - 400 Bad Request: 요청값 검증 실패
-    - 404 Not Found: project/job 없음
+    - 404 Not Found: beat/job 없음
     - 409 Conflict: 중복 생성 등
     - 500 Internal Server Error: 서버 오류
 
 ### 데이터 모델
 
-ProjectState
+BeatState (Ex-ProjectState)
 
 - created_at?: string (ISO 8601)
 - uploads_dir?: string
@@ -45,7 +45,7 @@ ProjectState
 JobStatus
 
 - job_id: string
-- project_name: string
+- beat_name: string
 - status: "running" | "completed" | "failed"
 - progress: string (예: "stage 2/8", "35%")
 - result?: any (완료 시 산출물 요약/경로)
@@ -54,35 +54,35 @@ JobStatus
 
 ## API 명세서
 
-### 1. 프로젝트 생성
+### 1. 비트 생성 (Create Beat)
 
-**POST** `/api/projects`
+**POST** `/api/beats`
 
 Request (JSON)
 
-- project_name?: string
+- beat_name?: string
 
 ```
 {
-	"project_name": "demo1"
+	"beat_name": "demo1"
 }
 ```
 
 Response 201 (JSON)
 
 - ok: true
-- project_name: string
+- beat_name: string
 
 ```
 {
 	"ok": true,
-	"project_name": "demo1"
+	"beat_name": "demo1"
 }
 ```
 
 동작 규칙
 
-- project_name 미지정 시 서버가 자동 생성 (예: "proj_20260204_052800")
+- beat_name 미지정 시 서버가 자동 생성 (예: "beat_20260204_052800")
 - 중복 이름이면 409 반환 또는 suffix 붙여 자동 생성(둘 중 하나로 고정)
 
 Error 409
@@ -90,17 +90,17 @@ Error 409
 ```
 {
 	"ok": false,
-	"error": "project already exists"
+	"error": "beat already exists"
 }
 ```
 
 ### 2. 파일 업로드
 
-**POST** `/api/projects/{projectName}/upload`
+**POST** `/api/beats/{beatName}/upload`
 
 Path
 
-- projectName: string
+- beatName: string
 
 Request (multipart/form-data)
 
@@ -109,7 +109,7 @@ Request (multipart/form-data)
 Response 200
 
 - ok: true
-- project_name: string
+- beat_name: string
 - uploaded: array
     - name: string
     - size: number
@@ -120,10 +120,10 @@ Response 200
 ```
 {
 	"ok": true,
-	"project_name": "demo1",
+	"beat_name": "demo1",
 	"uploaded": [
-		{ "name": "a.wav", "size": 123456, "saved_path": "projects/demo1/uploads/a.wav" },
-		{ "name": "b.wav", "size": 99999, "saved_path": "projects/demo1/uploads/b.wav" }
+		{ "name": "a.wav", "size": 123456, "saved_path": "outs/demo1/uploads/a.wav" },
+		{ "name": "b.wav", "size": 99999, "saved_path": "outs/demo1/uploads/b.wav" }
 	]
 }
 ```
@@ -139,11 +139,11 @@ Error 400 (파일 없음)
 
 ### 3. 초기 생성(전체 파이프라인 실행)
 
-**POST** `/api/projects/{projectName}/generate/initial` 
+**POST** `/api/beats/{beatName}/generate/initial` 
 
 Path
 
-- projectName: string
+- beatName: string
 
 Request (JSON, optional)
 
@@ -187,7 +187,7 @@ Error 404
 ```
 {
 	"ok": false,
-	"error": "project not found"
+	"error": "beat not found"
 }
 ```
 
@@ -200,18 +200,18 @@ Error 400 (업로드 파일 없음 등)
 }
 ```
 
-### 4. 프로젝트 상태 조회
+### 4. 비트 상태 조회
 
-**GET** `/api/projects/{projectName}/state` 
+**GET** `/api/beats/{beatName}/state` 
 
 Path
 
-- projectName: string
+- beatName: string
 
 Response 200
 
 - ok: true
-- state: ProjectState
+- state: BeatState
 
 예시
 
@@ -220,7 +220,7 @@ Response 200
 	"ok": true,	
 	"state": {	
 		"created_at": "2026-02-04T05:28:00Z",		
-		"uploads_dir": "projects/demo1/uploads",		
+		"uploads_dir": "outs/demo1/uploads",		
 		"config": {		
 			"bpm": 120,			
 			"style": "house",			
@@ -229,9 +229,9 @@ Response 200
 			"repeat_full": 1,			
 			"export_format": "mp3"		
 		},		
-		"latest_pools_json": "projects/demo1/out/pools.json",		
-		"latest_editor_json": "projects/demo1/out/editor.json",		
-		"latest_mp3": "projects/demo1/out/final.mp3",		
+		"latest_pools_json": "outs/demo1/out/pools.json",		
+		"latest_editor_json": "outs/demo1/out/editor.json",		
+		"latest_mp3": "outs/demo1/out/final.mp3",		
 		"updated_at": 1738647000		
 	}	
 }
@@ -242,17 +242,17 @@ Error 404
 ```
 {
 	"ok": false,
-	"error": "project not found"
+	"error": "beat not found"
 }
 ```
 
-### 5. 프로젝트 설정 업데이트
+### 5. 설정 업데이트
 
-**PATCH** `/api/projects/{projectName}/config`
+**PATCH** `/api/beats/{beatName}/config`
 
 Path
 
-- projectName: string
+- beatName: string
 
 Request (JSON)
 
@@ -270,7 +270,7 @@ Request (JSON)
 Response 200
 
 - ok: true
-- config: ProjectState.config (최신)
+- config: BeatState.config (최신)
 
 예시
 
@@ -299,11 +299,11 @@ Error 400 (타입/범위 오류)
 
 ### 6. 부분 재생성(특정 stage부터 다시)
 
-**POST** `/api/projects/{projectName}/regenerate`
+**POST** `/api/beats/{beatName}/regenerate`
 
 Path
 
-- projectName: string
+- beatName: string
 
 Request (JSON)
 
@@ -370,7 +370,7 @@ Response 200
 	"ok": true,
 	"job": {
 		"job_id": "job_20260204_053100_demo1_s4",
-		"project_name": "demo1",
+		"beat_name": "demo1",
 		"status": "running",
 		"progress": "stage 5/8",
 		"created_at": 1738647060
@@ -385,12 +385,12 @@ Response 200
 	"ok": true,
 	"job": {
 		"job_id": "job_20260204_053100_demo1_s4",
-		"project_name": "demo1",
+		"beat_name": "demo1",
 		"status": "completed",
 		"progress": "done",
 		"result": {
-			"latest_mp3": "projects/demo1/out/final.mp3",
-			"latest_editor_json": "projects/demo1/out/editor.json"
+			"latest_mp3": "outs/demo1/out/final.mp3",
+			"latest_editor_json": "outs/demo1/out/editor.json"
 		},
 		"created_at": 1738647060
 	}
@@ -404,7 +404,7 @@ Response 200
 	"ok": true,
 	"job": {
 		"job_id": "job_20260204_053100_demo1_s4",
-		"project_name": "demo1",
+		"beat_name": "demo1",
 		"status": "failed",
 		"progress": "error",
 		"error": "CUDA out of memory",
@@ -424,11 +424,11 @@ Error 404
 
 ### 8. 결과 다운로드
 
-**GET** `/api/projects/{projectName}/download?kind=mp3` 
+**GET** `/api/beats/{beatName}/download?kind=mp3` 
 
 Path
 
-- projectName: string
+- beatName: string
 
 Query
 

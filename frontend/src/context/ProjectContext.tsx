@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { beatApi } from '../api/beatApi';
 import type {
     ProjectContextState,
-    PipelineConfig,
+    PipelineConfig, // Alias for BeatConfig in API
     SoundFile,
     BeatGrid,
     RoleType
@@ -11,11 +11,18 @@ import type {
 const ProjectContext = createContext<ProjectContextState | null>(null);
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [projectName, setProjectName] = useState<string>('');
+    // State
+    const [beatName, setBeatName] = useState<string>('');
+    const [isConnected, setIsConnected] = useState<boolean>(false);
 
     // Job Status
     const [jobStatus, setJobStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
     const [jobProgress, setJobProgress] = useState<string>('');
+    const [jobId, setJobId] = useState<string | null>(null);
+
+    // Operational Flags
+    const [isUploading, setIsUploading] = useState<boolean>(false);
+    const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
     // Data
     const [config, setConfig] = useState<PipelineConfig>({
@@ -30,85 +37,105 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [uploadedFiles, setUploadedFiles] = useState<SoundFile[]>([]);
 
     // Results
-    const [grid, _setGrid] = useState<BeatGrid | null>(null);
-    const [rolePools, _setRolePools] = useState<Record<RoleType, string[]> | null>(null);
-    const [isConnected, setIsConnected] = useState<boolean>(false);
+    const [grid, setGrid] = useState<BeatGrid | null>(null);
+    const [rolePools, setRolePools] = useState<Record<RoleType, string[]> | null>(null);
+
+    // Playback
+    const [playbackState, setPlaybackState] = useState<{ isPlaying: boolean; currentTime: number; duration: number }>({
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0
+    });
 
     // Polling ref
     const pollInterval = useRef<number | null>(null);
 
-    // Pending Upload Promise (for chaining generate)
-    const currentUploadPromise = useRef<Promise<any> | null>(null);
-
-    // 1. Init Project on Mount
+    // 1. Init Session on Mount
     useEffect(() => {
         const init = async () => {
             try {
-                const res = await beatApi.create();
-                if (res.ok && res.project_name) {
-                    setProjectName(res.project_name);
+                const res = await beatApi.createBeat();
+                if (res.ok && res.beat_name) {
+                    setBeatName(res.beat_name);
                     setIsConnected(true);
+                    console.log(`[ProjectContext] Created beat session: ${res.beat_name}`);
                 }
             } catch (e) {
-                console.error("Failed to init project", e);
+                console.error("Failed to init beat session", e);
             }
         };
         init();
     }, []);
 
-    const fetchState = async (name: string) => {
+    // Helper to fetch full state
+    const refreshState = async () => {
+        if (!beatName) return;
         try {
-            const state = await beatApi.getState(name);
-            if (state.config) {
-                setConfig(prev => ({ ...prev, ...state.config }));
-            }
-            if (state.grid_content) {
-                _setGrid(state.grid_content);
-            }
-            if (state.pools_content) {
-                _setRolePools(state.pools_content);
+            const res = await beatApi.getBeatState(beatName);
+            if (res.ok && res.state) {
+                if (res.state.config) {
+                    setConfig(prev => ({ ...prev, ...res.state!.config }));
+                }
+                if (res.state.grid_content) {
+                    setGrid(res.state.grid_content);
+                }
+                if (res.state.pools_content) {
+                    setRolePools(res.state.pools_content);
+                }
             }
         } catch (e) {
             console.error("Fetch state error", e);
         }
     };
 
-    // Poll Job Status Logic
-    const startPolling = useCallback((jobId: string) => {
+    // Polling Logic
+    useEffect(() => {
+        if (!jobId) return;
+
         setJobStatus('running');
-        if (pollInterval.current) clearInterval(pollInterval.current);
+        // Clear existing interval if any (shouldn't happen with useEffect cleanup but safe)
+        if (pollInterval.current) window.clearInterval(pollInterval.current);
 
         pollInterval.current = window.setInterval(async () => {
             try {
-                const job = await beatApi.getJobStatus(jobId);
-                setJobProgress(job.progress);
-                console.log(`[Job Progress] ${job.progress}`); // Log progress to browser console
+                const res = await beatApi.getJobStatus(jobId);
+                if (res.ok && res.job) {
+                    setJobProgress(res.job.progress);
+                    // console.log(`[Job Progress] ${res.job.progress}`);
 
-                if (job.status === 'completed') {
-                    setJobStatus('completed');
-                    if (pollInterval.current) {
-                        clearInterval(pollInterval.current);
-                        pollInterval.current = null;
+                    if (res.job.status === 'completed') {
+                        setJobStatus('completed');
+                        setIsGenerating(false);
+                        setJobId(null); // Stop polling
+                        await refreshState();
+                    } else if (res.job.status === 'failed') {
+                        setJobStatus('failed');
+                        setJobProgress(res.job.error || 'Unknown error');
+                        setIsGenerating(false);
+                        setJobId(null); // Stop polling
+                        alert(`Job failed: ${res.job.error}`);
                     }
-                    await fetchState(job.project_name);
-                } else if (job.status === 'failed') {
-                    setJobStatus('failed');
-                    setJobProgress(job.error || 'Unknown error');
-                    if (pollInterval.current) clearInterval(pollInterval.current);
                 }
             } catch (e) {
                 console.error("Polling error", e);
             }
         }, 1000);
-    }, []);
+
+        return () => {
+            if (pollInterval.current) {
+                window.clearInterval(pollInterval.current);
+                pollInterval.current = null;
+            }
+        };
+    }, [jobId]);
 
     // Actions
-    const createProject = async () => {
+    const createBeat = async () => {
         window.location.reload();
     };
 
-    const uploadFilesActions = async (files: File[]) => {
-        if (!projectName) return;
+    const handleUpload = async (files: File[]) => {
+        if (!beatName) return;
 
         const newFiles: SoundFile[] = files.map(f => ({
             id: f.name,
@@ -117,111 +144,100 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             status: 'uploading'
         }));
         setUploadedFiles(prev => [...prev, ...newFiles]);
+        setIsUploading(true);
 
         try {
-            const uploadPromise = beatApi.upload(projectName, files);
-            currentUploadPromise.current = uploadPromise;
-            await uploadPromise;
-
+            await beatApi.uploadFiles(beatName, files);
             setUploadedFiles(prev => prev.map(f =>
                 newFiles.some(nf => nf.id === f.id) ? { ...f, status: 'done' } : f
             ));
+            await refreshState(); // Refresh state after upload (pools might be ready if sync)
         } catch (e) {
             console.error(e);
             setUploadedFiles(prev => prev.map(f =>
                 newFiles.some(nf => nf.id === f.id) ? { ...f, status: 'error' } : f
             ));
+            alert("Upload failed");
         } finally {
-            currentUploadPromise.current = null;
+            setIsUploading(false);
         }
     };
 
-    const generateInitial = async () => {
-        if (!projectName) return;
-
-        // Wait for pending upload if chained
-        if (currentUploadPromise.current) {
-            setJobStatus('running');
-            setJobProgress('Finishing upload...');
-            try {
-                await currentUploadPromise.current;
-            } catch (e) {
-                console.error("Implicit upload failed", e);
-                setJobStatus('failed');
-                return;
-            }
-        }
-
+    const generateBeat = async () => {
+        if (!beatName) return;
+        setIsGenerating(true);
         try {
-            const res = await beatApi.generateInitial(projectName, config);
+            const res = await beatApi.generateInitial(beatName, config);
             if (res.ok && res.job_id) {
-                startPolling(res.job_id);
+                setJobId(res.job_id); // Start polling
+            } else {
+                setIsGenerating(false);
             }
         } catch (e) {
             console.error(e);
+            setIsGenerating(false);
+            alert("Generation failed");
         }
     };
 
     const regenerate = async (fromStage: number, params?: Partial<PipelineConfig>) => {
-        if (!projectName) return;
+        if (!beatName) return;
+        setIsGenerating(true);
         try {
-            const res = await beatApi.regenerate(projectName, fromStage, params);
+            const res = await beatApi.regenerate(beatName, fromStage, params);
             if (res.ok && res.job_id) {
-                startPolling(res.job_id);
+                setJobId(res.job_id); // Start polling
+            } else {
+                setIsGenerating(false);
             }
         } catch (e) {
             console.error(e);
+            setIsGenerating(false);
+            alert("Regeneration failed");
         }
     };
 
-    const updateConfigHandler = async (updates: Partial<PipelineConfig>) => {
-        if (!projectName) return;
+    const updateConfig = async (updates: Partial<PipelineConfig>) => {
+        if (!beatName) return;
         setConfig(prev => ({ ...prev, ...updates }));
-        await beatApi.updateConfig(projectName, updates);
+        await beatApi.updateConfig(beatName, updates);
     };
-
-    try {
-        if (isConnected) {
-            // Check if active audio is available via some other call or just downloadUrl (done in components)
-        }
-    } catch { }
 
     const downloadUrl = (format: string = 'mp3') => {
-        if (!projectName) {
-            console.warn("[ProjectContext] downloadUrl called but projectName is empty");
+        if (!beatName) {
             return '';
         }
-        const url = beatApi.getDownloadUrl(projectName, format);
-        // console.log("[ProjectContext] Generated downloadUrl:", url);
-        return url;
+        return beatApi.getDownloadUrl(beatName, format);
     };
 
-    // Playhead Sync
-    const [playbackState, setPlaybackState] = useState<{ isPlaying: boolean; currentTime: number; duration: number }>({
-        isPlaying: false,
-        currentTime: 0,
-        duration: 0
-    });
+    const value: ProjectContextState = {
+        beatName,
+        isConnected,
+        jobStatus,
+        jobProgress,
+
+        isGenerating,
+        isUploading,
+
+        config,
+        uploadedFiles,
+
+        grid,
+        rolePools,
+
+        createBeat,
+        uploadFiles: handleUpload,
+        generateBeat,
+        regenerate,
+        updateConfig,
+        downloadUrl,
+
+        playbackState,
+        setPlaybackState
+    };
 
     return (
-        <ProjectContext.Provider value={{
-            projectName,
-            isConnected,
-            jobStatus,
-            jobProgress,
-            config,
-            uploadedFiles,
-            grid,
-            rolePools,
-            createProject,
-            uploadFiles: uploadFilesActions,
-            generateInitial,
-            regenerate,
-            updateConfig: updateConfigHandler,
-            downloadUrl,
-            playbackState,
-            setPlaybackState
-        }}>
+        <ProjectContext.Provider value={value}>
             {children}
         </ProjectContext.Provider>
     );

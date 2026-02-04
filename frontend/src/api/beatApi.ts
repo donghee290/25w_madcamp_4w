@@ -41,65 +41,114 @@ export interface JobStatus {
     created_at: number;
 }
 
+// Assuming API_BASE is defined elsewhere, e.g., in a config file or environment variable
+// For this refactor, we'll define it here for completeness.
+const API_BASE = http.defaults.baseURL || ""; // Use the existing http client's base URL
+
+type BeatConfig = ProjectState["config"]; // Assuming BeatConfig refers to the project's config structure
+
+// Response Types
+export interface BeatCreationResponse {
+    ok: boolean;
+    beat_name: string;
+    error?: string;
+}
+
+export interface FileUploadResponse {
+    ok: boolean;
+    beat_name?: string;
+    uploaded?: Array<{ name: string; size: number; saved_path: string }>;
+    error?: string;
+}
+
+export interface JobResponse {
+    ok: boolean;
+    job_id: string;
+    error?: string;
+}
+
+export interface BeatStateResponse {
+    ok: boolean;
+    state?: ProjectState;
+    error?: string;
+}
+
+export interface JobCheckResponse {
+    ok: boolean;
+    job?: JobStatus;
+    error?: string;
+}
+
 export const beatApi = {
-    // 1. Create Project
-    create: async (projectName?: string) => {
-        const res = await http.post("/api/projects", { project_name: projectName });
-        return res.data; // { ok: true, project_name: "..." }
+    async createBeat(): Promise<BeatCreationResponse> {
+        const res = await fetch(`${API_BASE}/api/beats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ beat_name: '' }) // let server autogen
+        });
+        if (!res.ok) throw new Error('Failed to create beat');
+        return res.json();
     },
 
-    // 2. Upload Files
-    upload: async (projectName: string, files: File[]) => {
+    async uploadFiles(beatName: string, files: File[]): Promise<FileUploadResponse> {
         const formData = new FormData();
-        files.forEach((f) => formData.append("audio", f));
+        files.forEach(f => formData.append('audio', f));
 
-        // Header 'Content-Type': 'multipart/form-data' is handled automatically by axios when passing FormData
-        const res = await http.post(`/api/projects/${projectName}/upload`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/upload`, {
+            method: 'POST',
+            body: formData,
         });
-        return res.data;
+        if (!res.ok) throw new Error('Upload failed');
+        return res.json();
     },
 
-    // 3. Initial Generation (Full Pipeline)
-    generateInitial: async (projectName: string, params?: any) => {
-        // params: { bpm, style, seed, export_format, ... }
-        const res = await http.post(`/api/projects/${projectName}/generate/initial`, params);
-        return res.data; // { ok: true, job_id: "..." }
-    },
-
-    // 4. Get Project State
-    getState: async (projectName: string) => {
-        const res = await http.get<{ ok: boolean; state: ProjectState }>(
-            `/api/projects/${projectName}/state`
-        );
-        return res.data.state;
-    },
-
-    // 5. Update Configuration
-    updateConfig: async (projectName: string, config: Partial<ProjectState["config"]>) => {
-        const res = await http.patch(`/api/projects/${projectName}/config`, config);
-        return res.data; // { ok: true, config: ... }
-    },
-
-    // 6. Regenerate (Partial)
-    regenerate: async (projectName: string, fromStage: number, params?: any) => {
-        const res = await http.post(`/api/projects/${projectName}/regenerate`, {
-            from_stage: fromStage,
-            params,
+    async generateInitial(beatName: string, config: BeatConfig): Promise<JobResponse> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/generate/initial`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
         });
-        return res.data; // { ok: true, job_id: "..." }
+        if (!res.ok) throw new Error('Initial generation failed');
+        return res.json();
     },
 
-    // 7. Poll Job Status
-    getJobStatus: async (jobId: string) => {
-        const res = await http.get<{ ok: boolean; job: JobStatus }>(`/api/jobs/${jobId}`);
-        return res.data.job;
+    async getBeatState(beatName: string): Promise<BeatStateResponse> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/state`);
+        if (!res.ok) {
+            if (res.status === 404) throw new Error('Beat not found');
+            throw new Error('Failed to fetch state');
+        }
+        return res.json();
     },
 
-    // 8. Download URL helper
-    getDownloadUrl: (projectName: string, kind: string = "mp3") => {
-        const baseURL = http.defaults.baseURL || "";
-        // Note: 'kind' matches the requested format (wav, mp3, flac, etc.)
-        return `${baseURL}/api/projects/${projectName}/download?kind=${kind}`;
+    async updateConfig(beatName: string, config: Partial<BeatConfig>): Promise<{ ok: boolean; config?: BeatConfig }> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/config`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        if (!res.ok) throw new Error('Failed to update config');
+        return res.json();
     },
+
+    async regenerate(beatName: string, fromStage: number, params?: any): Promise<JobResponse> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/regenerate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from_stage: fromStage, params })
+        });
+        if (!res.ok) throw new Error('Regeneration failed');
+        return res.json();
+    },
+
+    async getJobStatus(jobId: string): Promise<JobCheckResponse> {
+        const res = await fetch(`${API_BASE}/api/jobs/${jobId}`);
+        if (!res.ok) throw new Error('Failed to check job');
+        return res.json();
+    },
+
+    // Legacy / Convenience
+    getDownloadUrl(beatName: string, kind: string = 'mp3'): string {
+        return `${API_BASE}/api/beats/${beatName}/download?kind=${kind}`;
+    }
 };
