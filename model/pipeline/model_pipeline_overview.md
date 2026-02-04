@@ -40,37 +40,41 @@ The pipeline transforms raw audio inputs into a fully produced, role-assigned, a
 
 
 
-## Step 3: Grid Setup (`step3_run_grid_and_skeleton.py`)
-**Goal**: Create the "Container" (Grid, BPM, Bars).
-- **Input**: BPM, bars.
+## Step 3: Grid & Skeleton Setup (`step3_run_grid_and_skeleton.py`)
+**Goal**: Create the "Container" (Grid, BPM, Bars) and the "Structural Constraints" (Skeleton).
+- **Input**: BPM, bars, style (e.g., House, HipHop, Funk).
 - **Process**:
-    1.  **Grid Setup**: Defines the timeline (BPM, meter, steps). This is the *Standardized Format*.
+    1.  **Grid Setup**: Defines the timeline (BPM, meter, steps).
+    2.  **Skeleton Generation**: Creates a "rhythm skeleton" (Kick/Snare patterns) based on the selected style.
+        - Provides a stable foundation for the AI to build upon.
+        - Ensures the output respects the genre's characteristic groove.
 - **Output**: 
     - `grid_{ver}.json` (The essential "Container")
-
-
+    - `skeleton_{ver}.json` (The "Constraint Map")
 
 
 ## Step 4: AI Generator (`step4_run_model_transformer.py`)
-**Goal**: Generate complex rhythmic patterns using a trained Transformer model (Causal LM).
-- **Input**: `grid.json` (for BPM/Bar context), `role_pools.json`.
+**Goal**: Generate complex rhythmic patterns using a trained Transformer model (Causal LM), strictly enforced by the Skeleton.
+- **Input**: `grid.json`, `skeleton.json`, `role_pools.json`.
 - **Process**:
-    1.  **Initialization**: Loads `Ultimate_Drums_Transformer`.
-    2.  **Generation**: Generates a drum pattern from scratch (using the Setup from Stage 3). It does *not* modify the Stage 3 skeleton; it populates the empty grid.
-    3.  **MIDI Decoding**: Converts model tokens to MIDI.
-    4.  **Event Mapping**: Parses MIDI into the pipeline's event format (`Core`, `Accent`, `Motion`, etc.) based on pitch.
+    1.  **Candidate Generation**: Generates multiple candidate beat variations using the Transformer model.
+    2.  **Selection**: Compares candidates against the `skeleton.json` structure and selects the best statistical match.
+    3.  **Hybrid Merge**: Merges the selected AI candidate with the Skeleton.
+        - **Enforces** structural events (Core, Accent, Motion - Fill/Texture).
+        - **Retains** AI's creative details (Velocity nuances, Micro-timing, Variations).
+    4.  **Event Mapping**: Parses tokens into the pipeline's event format.
 - **Output**: 
-    - `transformer_output_{ver}.mid`
-    - `event_grid_transformer_{ver}.json` (The "AI Generated" Content)
+    - `event_grid_transformer_{ver}.json` (The "AI Generated + Merged" Content)
 
 
 ## Step 5: Note & Layout (`step5_run_note_and_midi.py`)
-**Goal**: Finalize note placement, assign specific samples, and build song structure.
+**Goal**: Finalize note placement, assign specific samples, and build song structure via Progressive Layering.
 - **Input**: Transformer/Skeleton events, Role Pools, Notes JSON.
 - **Process**:
-    1.  **Sample Selection**: Picks specific wav files from the pools for each event (Round-Robin, Random, or Fixed).
-    2.  **Normalization**: Aligns notes to the grid with optional micro-timing clamping.
-    3.  **Progressive Layering** (Important): Can build a full song structure by layering intensities (e.g., Core only -> Core+Accent -> Full).
+    1.  **Dynamic Expansion**: Automatically expands the Grid if the AI's generated content (e.g., 32 bars) exceeds the initial grid size (e.g., 4 bars).
+    2.  **Sample Selection**: Picks specific wav files from the pools.
+    3.  **Normalization**: Aligns notes to the grid.
+    4.  **Progressive Layering**: Builds a full song structure (~1 min+) by layering roles (Core -> Core+Accent -> Full Loop) for a dynamic arrangement.
 - **Output**: 
     - `event_grid_{ver}.json` (Main output with finalized sample IDs)
     - `notes_{ver}.mid` (Standard MIDI file)
