@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
-from backend.model_loader import SoundRoutineModel
+from model_loader import SoundRoutineModel
 
 
 def create_app() -> Flask:
