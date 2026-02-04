@@ -131,11 +131,11 @@ const BeatCanvas = () => {
                     )}
 
                     {/* Lanes Container */}
-                    <div className="flex flex-col">
-                        {ROW_ORDER.map((role, idx) => (
-                            <div key={role} className={`flex h-12 border-b border-gray-100 ${idx === 0 ? 'border-t' : ''} hover:bg-gray-50 transition-colors`}>
+                    <div className="flex flex-col gap-2">
+                        {ROW_ORDER.map((role) => (
+                            <div key={role} className={`flex h-24 hover:bg-gray-50 transition-colors rounded-lg overflow-hidden`}>
                                 {/* Role Label */}
-                                <div className="w-[80px] shrink-0 flex items-center justify-end pr-3 border-r border-gray-100">
+                                <div className="w-[80px] shrink-0 flex items-center justify-end pr-3 border-r-0">
                                     <span
                                         className="px-2 py-1 text-[10px] font-bold rounded text-white shadow-sm tracking-wide"
                                         style={{ backgroundColor: ROLE_COLORS[role] }}
@@ -149,7 +149,7 @@ const BeatCanvas = () => {
                                     {/* Vertical Grid Lines (Background for this row) */}
                                     <div className="absolute inset-0 flex pointer-events-none z-0">
                                         {Array.from({ length: stepsPerBar }).map((_, i) => (
-                                            <div key={i} className={`flex-1 border-r ${i % 4 === 3 ? 'border-gray-200' : 'border-gray-50'}`}></div>
+                                            <div key={i} className={`flex-1 border-r ${i % 4 === 3 ? 'border-gray-100' : 'border-gray-50/50'}`}></div>
                                         ))}
                                     </div>
 
