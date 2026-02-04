@@ -49,8 +49,13 @@ const BeatCanvas = () => {
         const startStep = barIndex * stepsPerBar;
         const endStep = startStep + stepsPerBar;
 
-        // Filter events for this bar
-        const barEvents = grid.events.filter(e => e.step >= startStep && e.step < endStep);
+        // Filter events for this bar (overlapping)
+        const barEvents = grid.events.filter(e => {
+            const eStart = e.step;
+            const eDur = (e as any).dur_steps || (e as any).duration || 1;
+            const eEnd = eStart + eDur;
+            return eStart < endStep && eEnd > startStep;
+        });
 
         // Playhead local calculation
         const isPlayheadInBar = currentStep >= startStep && currentStep < endStep;
@@ -112,7 +117,13 @@ const BeatCanvas = () => {
                                 <div key={role} className="h-8 flex bg-gray-50/50 rounded-sm overflow-hidden relative">
                                     {Array.from({ length: stepsPerBar }).map((_, stepOffset) => {
                                         const currentStep = startStep + stepOffset;
-                                        const event = barEvents.find(e => e.role === role && e.step === currentStep);
+
+                                        const event = barEvents.find(e => {
+                                            const eStart = e.step;
+                                            const eDur = (e as any).dur_steps || (e as any).duration || 1;
+                                            const eEnd = eStart + eDur;
+                                            return e.role === role && currentStep >= eStart && currentStep < eEnd;
+                                        });
 
                                         return (
                                             <div key={stepOffset} className="flex-1 p-0.5 border-r border-transparent">
@@ -120,9 +131,7 @@ const BeatCanvas = () => {
                                                     <div
                                                         className={`w-full h-full rounded shadow-sm hover:scale-110 transition-transform cursor-pointer`}
                                                         style={{
-                                                            backgroundColor: role === 'CORE' ? 'red' :
-                                                                role === 'ACCENT' ? 'gold' :
-                                                                    role === 'MOTION' ? 'blue' : 'green',
+                                                            backgroundColor: ROLE_COLORS[role].replace('bg-', '').replace('orange-500', '#f97316').replace('yellow-400', '#facc15').replace('blue-500', '#3b82f6').replace('purple-600', '#9333ea').replace('green-500', '#22c55e'),
                                                             minHeight: '20px',
                                                             width: '100%',
                                                             display: 'block'

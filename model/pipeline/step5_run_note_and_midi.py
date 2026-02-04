@@ -34,8 +34,8 @@ def parse_args() -> argparse.Namespace:
     # progressive (core-only 4 bars -> +accent 4 bars -> ...)
     p.add_argument("--progressive", type=int, default=1, help="If 1, generates full song structure using progressive layering")
     p.add_argument("--segment_bars", type=int, default=4)
-    p.add_argument("--layers", type=str, default="CORE,ACCENT,MOTION,FILL")  # comma sep
-    p.add_argument("--repeat_full", type=int, default=4, help="Number of times to repeat the final full section")
+    p.add_argument("--layers", type=str, default="CORE,ACCENT,MOTION,FILL,TEXTURE")  # comma sep
+    p.add_argument("--repeat_full", type=int, default=2, help="Number of times to repeat the final full section")
 
     return p.parse_args()
 
@@ -57,6 +57,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     grid = load_grid_json(args.grid_json)
+    base_grid_bars = grid.num_bars  # Capture original length for looping
     pools = load_pools_json(args.pools_json)
     notes = load_note_list_json(args.notes_json)
 
@@ -133,7 +134,8 @@ def main() -> None:
         pcfg = ProgressiveConfig(
             segment_bars=final_seg_bars, 
             layers=layers,
-            final_repeat=int(args.repeat_full)
+            final_repeat=int(args.repeat_full),
+            base_loop_len=base_grid_bars,
         )
         final_grid, final_events, final_meta = build_progressive_timeline(grid, base_loop_events, pcfg)
         

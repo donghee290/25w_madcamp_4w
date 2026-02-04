@@ -8,36 +8,36 @@ from ..types import DSPFeatures, Role, ScoreVector
 
 @dataclass
 class TextureSuppressConfig:
-    transient_S_threshold: float = 0.60
-    decay_short_threshold: float = 0.32
-    multiply: float = 0.60
+    transient_S_threshold: float = 0.95
+    decay_short_threshold: float = 0.05
+    multiply: float = 0.90
 
 
 @dataclass
 class SustainedNoiseSuppressConfig:
-    decay_long_threshold: float = 0.70
-    flatness_threshold: float = 0.25
-    core_multiply: float = 0.65
-    accent_multiply: float = 0.75
+    decay_long_threshold: float = 1.0
+    flatness_threshold: float = 0.60
+    core_multiply: float = 0.90
+    accent_multiply: float = 0.90
 
 
 @dataclass
 class MotionMinConditionConfig:
-    high_ratio_threshold: float = 0.33
-    decay_max_threshold: float = 0.55
-    multiply: float = 0.70
+    high_ratio_threshold: float = 0.05
+    decay_max_threshold: float = 2.0
+    multiply: float = 0.90
 
 
 @dataclass
 class FillConservativeConfig:
-    min_prob: float = 0.35
-    min_margin: float = 0.12
-    multiply: float = 0.70
+    min_prob: float = 0.10
+    min_margin: float = 0.01
+    multiply: float = 0.90
 
 
 @dataclass
 class LowConfTextureExtraSuppressConfig:
-    enabled: bool = True
+    enabled: bool = False
     margin_threshold: float = 0.10
     multiply: float = 0.80
     percussive_roles: List[str] = None

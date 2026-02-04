@@ -18,6 +18,9 @@ class ProgressiveConfig:
     # 마지막 "풀 레이어" 반복 (원하면 0으로)
     final_repeat: int = 0
 
+    # 5/5 bar issue fix: Force based loop length (e.g. 4)
+    base_loop_len: int = None
+
 
 def filter_by_roles(events: List[Event], allowed: set[str]) -> List[Event]:
     return [e for e in events if str(e.role).upper() in allowed]
@@ -51,32 +54,42 @@ def _has_any_role(events: List[Event], role: str) -> bool:
     return False
 
 
-def _fit_to_segment(events: List[Event], seg: int) -> List[Event]:
+def _fit_to_segment(events: List[Event], seg: int, base_len_override: int = None) -> List[Event]:
     """
     base_events는 보통 base_grid.num_bars 길이(예: 4bar)로 들어오는데,
     segment_bars=8로 늘리려면 "패턴을 반복"해서 seg 길이로 맞춘다.
+    base_len_override가 있으면 그 길이를 기준으로 반복한다(overflow 방지).
     """
     if seg <= 0:
         return []
 
-    # base 길이 추정: events 중 최대 bar 기준으로 계산
-    max_bar = 0
-    for e in events:
-        if int(e.bar) > max_bar:
-            max_bar = int(e.bar)
-    base_len = max_bar + 1  # bar index는 0-based
+    # base 길이 추정
+    if base_len_override is not None and base_len_override > 0:
+        base_len = base_len_override
+    else:
+        max_bar = 0
+        for e in events:
+            if int(e.bar) > max_bar:
+                max_bar = int(e.bar)
+        base_len = max_bar + 1  # bar index는 0-based
+
     if base_len <= 0:
         base_len = 1
 
     if base_len == seg:
         return [e for e in events if 0 <= int(e.bar) < seg]
 
-    # base_len < seg 인 경우: 반복해서 seg까지 채움
+    # base_len < seg (or mismatch): 반복해서 seg까지 채움/자름
     out: List[Event] = []
     repeat = (seg + base_len - 1) // base_len  # ceil
     for r in range(repeat):
         offset = r * base_len
         for e in events:
+            # 원본이 base_len보다 긴 경우(overflow)도 있는데,
+            # base_len_override가 있다면, 그 길이만큼은 "다음 루프"의 시작점과 겹치게 됨.
+            # 하지만 단순 반복을 위해 여기서는 nb = e.bar + offset으로 둔다.
+            # 만약 e.bar >= base_len_override라면, 다음 루프 영역에 찍히게 된다.
+            
             nb = int(e.bar) + offset
             if 0 <= nb < seg:
                 out.append(
@@ -123,16 +136,8 @@ def build_progressive_timeline(
         }
         return base_grid, base_events, meta
 
-    # optional layer 존재 여부에 따라 실제 빌드업 단계 결정
-    fill_exists = _has_any_role(base_events, "FILL")
-    texture_exists = _has_any_role(base_events, "TEXTURE")
-
-    # 진행 순서는 고정이지만, 존재하지 않으면 단계 자체를 건너뜀
-    effective_layers: List[str] = ["CORE", "ACCENT", "MOTION"]
-    if fill_exists:
-        effective_layers.append("FILL")
-    if texture_exists:
-        effective_layers.append("TEXTURE")
+    # 진행 순서는 config를 따름 (존재하지 않아도 단계 생성 -> 빈 공간 확보하여 구조 유지)
+    effective_layers = list(cfg.layers)
 
     # 누적 허용 role set을 단계별로 확장
     allowed: set[str] = set()
@@ -145,7 +150,7 @@ def build_progressive_timeline(
         allowed.add(role.upper())
 
         layer_events = filter_by_roles(base_events, allowed)
-        layer_events = _fit_to_segment(layer_events, seg)  # 핵심: 8bar segment에 맞게 반복/자르기
+        layer_events = _fit_to_segment(layer_events, seg, cfg.base_loop_len)  # 핵심: 8bar segment에 맞게 반복/자르기
 
         bar_offset = i * seg
         staged_events.extend(shift_bars(layer_events, bar_offset))
@@ -164,7 +169,7 @@ def build_progressive_timeline(
     current_seg_idx = len(effective_layers)
     if cfg.final_repeat > 0:
         final_events = filter_by_roles(base_events, allowed)
-        final_events = _fit_to_segment(final_events, seg)
+        final_events = _fit_to_segment(final_events, seg, cfg.base_loop_len)
 
         for r in range(int(cfg.final_repeat)):
             bar_offset = (current_seg_idx + r) * seg

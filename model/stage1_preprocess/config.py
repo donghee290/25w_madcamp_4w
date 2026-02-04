@@ -100,7 +100,6 @@ class PipelineConfig:
 
     # Deduplication
     dedup_enabled: bool = True
-    dedup_enabled: bool = True
     dedup_threshold: float = 0.5  # cosine distance threshold
     min_hit_duration_s: float = 0.1  # discard hits shorter than 100ms
 
