@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useProject } from '../../context/ProjectContext';
-import { Upload, X, Music, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, X, Music, AlertCircle, Loader2 } from 'lucide-react';
 import type { RoleType } from '../../types/beatType';
 
 const ROLE_COLORS: Record<RoleType, string> = {
@@ -26,7 +26,7 @@ const SoundMaterial = () => {
         if (!rolePools) return [];
         const roles: RoleType[] = [];
         Object.entries(rolePools).forEach(([role, files]) => {
-            if (files.some(f => f.includes(fileName))) {
+            if (Array.isArray(files) && files.some(f => typeof f === 'string' && f.includes(fileName))) {
                 roles.push(role as RoleType);
             }
         });
@@ -73,7 +73,7 @@ const SoundMaterial = () => {
                                     </span>
                                 </div>
 
-                                {file.status === 'done' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                                {/* Removed CheckCircle as requested */}
                                 {file.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
                                 {file.status === 'idle' && <button className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>}
                             </div>
@@ -86,9 +86,8 @@ const SoundMaterial = () => {
                                         </span>
                                     ))
                                 ) : (
-                                    file.status === 'done' && !rolePools && (
-                                        <span className="text-[10px] text-gray-400 italic">Ready to process</span>
-                                    )
+                                    /* Removed 'Ready to process' text to remove 'check-like' indicators */
+                                    null
                                 )}
                             </div>
                         </div>
@@ -120,16 +119,21 @@ const SoundMaterial = () => {
 };
 
 const GenerateButton = () => {
-    const { generateInitial, jobStatus, jobProgress, isConnected } = useProject();
+    const { generateInitial, jobStatus, jobProgress, isConnected, uploadedFiles } = useProject();
 
     const isProcessing = jobStatus === 'running';
+    const hasFiles = uploadedFiles.length > 0;
+
+    // Disable if: Processing OR Not Connected OR No Files
+    // ENABLED even if uploading (logic handled in context)
+    const isDisabled = isProcessing || !isConnected || !hasFiles;
 
     return (
         <button
-            disabled={isProcessing || !isConnected}
+            disabled={isDisabled}
             onClick={generateInitial}
             className={`w-full py-3 rounded-lg font-bold text-sm shadow-sm transition-all flex justify-center items-center gap-2
-                ${isProcessing
+                ${isDisabled
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-yellow-400 hover:bg-yellow-300 text-black active:scale-[0.98]'
                 }

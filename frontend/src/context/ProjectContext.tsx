@@ -37,6 +37,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Polling ref
     const pollInterval = useRef<number | null>(null);
 
+    // Pending Upload Promise (for chaining generate)
+    const currentUploadPromise = useRef<Promise<any> | null>(null);
+
     // 1. Init Project on Mount
     useEffect(() => {
         const init = async () => {
@@ -58,6 +61,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const state = await beatApi.getState(name);
             if (state.config) {
                 setConfig(prev => ({ ...prev, ...state.config }));
+            }
+            if (state.grid_content) {
+                _setGrid(state.grid_content);
+            }
+            if (state.pools_content) {
+                _setRolePools(state.pools_content);
             }
         } catch (e) {
             console.error("Fetch state error", e);
@@ -110,7 +119,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setUploadedFiles(prev => [...prev, ...newFiles]);
 
         try {
-            await beatApi.upload(projectName, files);
+            const uploadPromise = beatApi.upload(projectName, files);
+            currentUploadPromise.current = uploadPromise;
+            await uploadPromise;
+
             setUploadedFiles(prev => prev.map(f =>
                 newFiles.some(nf => nf.id === f.id) ? { ...f, status: 'done' } : f
             ));
@@ -119,11 +131,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setUploadedFiles(prev => prev.map(f =>
                 newFiles.some(nf => nf.id === f.id) ? { ...f, status: 'error' } : f
             ));
+        } finally {
+            currentUploadPromise.current = null;
         }
     };
 
     const generateInitial = async () => {
         if (!projectName) return;
+
+        // Wait for pending upload if chained
+        if (currentUploadPromise.current) {
+            setJobStatus('running');
+            setJobProgress('Finishing upload...');
+            try {
+                await currentUploadPromise.current;
+            } catch (e) {
+                console.error("Implicit upload failed", e);
+                setJobStatus('failed');
+                return;
+            }
+        }
+
         try {
             const res = await beatApi.generateInitial(projectName, config);
             if (res.ok && res.job_id) {
@@ -151,6 +179,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setConfig(prev => ({ ...prev, ...updates }));
         await beatApi.updateConfig(projectName, updates);
     };
+
+    try {
+        if (isConnected) {
+            // Check if active audio is available via some other call or just downloadUrl (done in components)
+        }
+    } catch { }
 
     const downloadUrl = (format: string = 'mp3') => {
         if (!projectName) return '';

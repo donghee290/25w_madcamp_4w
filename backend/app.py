@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import uuid
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -21,6 +23,7 @@ def create_app() -> Flask:
     DEFAULT_OUTS_DIR = PROJECT_ROOT / "outs"
 
     # ---- Singleton model/pipeline runner
+    # FIX: Pass project_root
     app.model = SoundRoutineModel(project_root=PROJECT_ROOT)  # type: ignore[attr-defined]
 
     @app.get("/api/health")
@@ -43,7 +46,9 @@ def create_app() -> Flask:
     def create_project():
         """Creates a new project (empty state)."""
         data = request.json or {}
-        project_name = data.get("project_name") or f"project_{uuid.uuid4().hex[:8]}"
+        # Use timestamp for easy identification during testing
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        project_name = data.get("project_name") or f"project_{timestamp}"
         
         # Init state
         try:
@@ -108,8 +113,27 @@ def create_app() -> Flask:
 
     @app.get("/api/projects/<project_name>/state")
     def get_project_state(project_name: str):
-        """Returns the current state.json content."""
+        """Returns the current state.json content, plus active grid/pool data."""
         state = app.model.get_state(project_name) # type: ignore
+        
+        # Inject Grid Content if path exists
+        grid_path = state.get("latest_grid_json")
+        if grid_path and os.path.exists(grid_path):
+            try:
+                with open(grid_path, "r") as f:
+                    state["grid_content"] = json.load(f)
+            except Exception as e:
+                print(f"Error reading grid: {e}")
+
+        # Inject Pools Content
+        pools_path = state.get("latest_pools_json")
+        if pools_path and os.path.exists(pools_path):
+            try:
+                with open(pools_path, "r") as f:
+                    state["pools_content"] = json.load(f)
+            except Exception as e:
+                print(f"Error reading pools: {e}")
+
         return jsonify({"ok": True, "state": state})
 
     @app.patch("/api/projects/<project_name>/config")
@@ -220,23 +244,21 @@ def create_app() -> Flask:
     @app.get("/api/projects/<project_name>/download")
     def download(project_name: str):
         kind = (request.args.get("kind") or "mp3").lower().strip()
-        if kind not in {"mp3", "wav"}:
-            return jsonify({"ok": False, "error": "kind must be mp3 or wav"}), 400
+        # Allow common audio formats
+        if kind not in {"mp3", "wav", "flac", "ogg", "m4a"}:
+            return jsonify({"ok": False, "error": "Supported formats: mp3, wav, flac, ogg, m4a"}), 400
 
         try:
-            info = app.model.get_latest_output(project_name)  # type: ignore[attr-defined]
+            # On-demand conversion
+            file_path = app.model.convert_output(project_name, kind) # type: ignore
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 404
-
-        file_path = Path(info["mp3_path"] if kind == "mp3" else info["wav_path"])
-        if not file_path.exists():
-            return jsonify({"ok": False, "error": f"File not found: {file_path}"}), 404
 
         return send_file(
             file_path,
             as_attachment=True,
             download_name=file_path.name,
-            mimetype="audio/mpeg" if kind == "mp3" else "audio/wav",
+            mimetype=f"audio/{kind}" if kind != "m4a" else "audio/mp4",
         )
 
     return app

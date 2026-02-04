@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
-import { Download, Settings, Sliders, Save } from 'lucide-react';
+import { Download, Settings, Sliders, Save, ChevronDown } from 'lucide-react';
 
 const ControlPanel = () => {
     const { config, updateConfig, regenerate, downloadUrl } = useProject();
+    const [exportFormat, setExportFormat] = useState('mp3');
 
     const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         updateConfig({ bpm: parseFloat(e.target.value) });
@@ -47,6 +48,24 @@ const ControlPanel = () => {
                     </div>
                 </div>
 
+                {/* Export Format Selector */}
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Export Format</label>
+                    <div className="relative">
+                        <select
+                            value={exportFormat}
+                            onChange={(e) => setExportFormat(e.target.value)}
+                            className="w-full appearance-none bg-white border-2 border-gray-100 rounded-lg px-3 py-2 text-sm font-bold text-gray-700 focus:border-blue-400 focus:outline-none transition-colors"
+                        >
+                            <option value="mp3">MP3</option>
+                            <option value="wav">WAV</option>
+                            <option value="flac">FLAC</option>
+                            <option value="ogg">OGG</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                </div>
+
                 {/* Divider */}
                 <hr className="border-gray-100" />
 
@@ -55,23 +74,20 @@ const ControlPanel = () => {
                     <button className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
                         <Save className="w-4 h-4" />
                         Save Project
-                    </button> // Just a placeholder for now
+                    </button>
                 </div>
             </div>
 
             {/* Footer / Export */}
             <div className="p-6 border-t border-gray-100 bg-gray-50">
                 <a
-                    href={downloadUrl('mp3')}
+                    href={downloadUrl(exportFormat)}
                     download
                     className="w-full py-4 bg-black hover:bg-gray-800 text-white rounded-xl font-bold text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                     <Download className="w-4 h-4" />
-                    Download Beat
+                    Download {exportFormat.toUpperCase()}
                 </a>
-                <div className="text-center mt-3 text-[10px] text-gray-400 font-medium">
-                    MP3 • WAV • FLAC
-                </div>
             </div>
         </div>
     );

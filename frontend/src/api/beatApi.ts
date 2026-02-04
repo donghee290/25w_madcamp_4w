@@ -1,4 +1,5 @@
 import { http } from "./http";
+import type { BeatGrid, RoleType } from "../types/beatType";
 
 export interface ProjectState {
     created_at?: string;
@@ -24,6 +25,10 @@ export interface ProjectState {
     latest_mp3?: string;
     latest_wav?: string;
     updated_at?: number;
+
+    // Injected Content
+    grid_content?: BeatGrid;
+    pools_content?: Record<RoleType, string[]>;
 }
 
 export interface JobStatus {
