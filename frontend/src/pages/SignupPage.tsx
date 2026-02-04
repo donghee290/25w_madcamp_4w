@@ -16,11 +16,18 @@ export default function SignupPage() {
     const [job, setJob] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [idError, setIdError] = useState<string | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [confirmPassword, setConfirmPassword] = useState("");
     const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
 
     // 실시간 유효성 검사 (에러 제거용)
+    useEffect(() => {
+        if (id && /^[a-zA-Z0-9]+$/.test(id)) {
+            setIdError(null);
+        }
+    }, [id]);
+
     useEffect(() => {
         if (password.length >= 6) {
             setPasswordError(null);
@@ -36,10 +43,16 @@ export default function SignupPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setIdError(null);
         setPasswordError(null);
         setConfirmPasswordError(null);
 
         let hasError = false;
+
+        if (!/^[a-zA-Z0-9]+$/.test(id)) {
+            setIdError("Only English letters and numbers allowed");
+            hasError = true;
+        }
 
         if (password.length < 6) {
             setPasswordError("Must be at least 6 characters");
@@ -97,17 +110,20 @@ export default function SignupPage() {
                     {error && <div className="signup-error">{error}</div>}
 
                     <form onSubmit={handleSubmit} className="signup-form">
-                        <div className="form-row">
-                            <label htmlFor="id">ID:</label>
-                            <input
-                                id="id"
-                                type="text"
-                                value={id}
-                                onChange={(e) => setId(e.target.value)}
-                                required
-                                onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
-                                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
-                            />
+                        <div className="form-group-password">
+                            <div className="form-row">
+                                <label htmlFor="id">ID:</label>
+                                <input
+                                    id="id"
+                                    type="text"
+                                    value={id}
+                                    onChange={(e) => setId(e.target.value)}
+                                    required
+                                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
+                                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+                                />
+                            </div>
+                            {idError && <div className="password-error-msg">{idError}</div>}
                         </div>
 
                         <div className="form-group-password">
