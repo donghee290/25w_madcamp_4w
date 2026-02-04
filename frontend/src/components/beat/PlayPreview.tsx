@@ -14,12 +14,12 @@ const PlayPreview = () => {
 
     // Fetch MP3 URL when available
     useEffect(() => {
-        if (isConnected) {
-            const url = downloadUrl('mp3');
-            console.log("[PlayPreview] Setting audioUrl:", url, "isConnected:", isConnected);
+        if (isConnected && grid) {
+            const url = downloadUrl('wav');
+            console.log("[PlayPreview] Setting audioUrl:", url);
             setAudioUrl(url);
         } else {
-            console.log("[PlayPreview] Not connected yet.");
+            setAudioUrl('');
         }
     }, [isConnected, grid]);
 
@@ -75,7 +75,7 @@ const PlayPreview = () => {
                 src={audioUrl}
                 onTimeUpdate={onTimeUpdate}
                 onEnded={handleEnded}
-                onLoadedMetadata={onTimeUpdate}
+                onLoadedMetadata={onLoadedMetadata}
             />
 
             {/* Transport Controls */}
@@ -84,9 +84,12 @@ const PlayPreview = () => {
                     <button className="text-gray-400 hover:text-gray-600"><SkipBack className="w-5 h-5" /></button>
                     <button
                         onClick={togglePlay}
-                        className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center hover:scale-105 transition-transform shadow-md"
+                        disabled={!audioUrl}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-md
+                            ${!audioUrl ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white'}
+                        `}
                     >
-                        {isPlaying ? <Pause className="fill-white w-4 h-4 ml-0.5" /> : <Play className="fill-white w-4 h-4 ml-1" />}
+                        {isPlaying ? <Pause className="fill-current w-4 h-4 ml-0.5" /> : <Play className="fill-current w-4 h-4 ml-1" />}
                     </button>
                     <button className="text-gray-400 hover:text-gray-600"><SkipForward className="w-5 h-5" /></button>
                 </div>
