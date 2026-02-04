@@ -237,9 +237,12 @@ def render_events(
         mix[start:end] += y[: end - start]
 
     # 마스터 노멀라이즈 (hard clip 방지)
-    peak = float(np.max(np.abs(mix)) + 1e-9)
-    if peak > 1.0:
-        mix /= peak
+    peak = float(np.max(np.abs(mix)))
+    if peak > 1e-6:
+        if peak > 1.0:
+            mix /= peak
+        elif peak < 0.2:
+            mix *= (0.9 / peak)
     mix *= float(master_gain)
 
     out_wav.parent.mkdir(parents=True, exist_ok=True)

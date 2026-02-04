@@ -185,18 +185,18 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    grid = json.loads(Path(args.grid_json).read_text())
+    grid = json.loads(Path(args.grid_json).read_text(encoding='utf-8'))
     
     skeleton_events = []
     if args.skeleton_json and Path(args.skeleton_json).exists():
-        skeleton_events = json.loads(Path(args.skeleton_json).read_text())
+        skeleton_events = json.loads(Path(args.skeleton_json).read_text(encoding='utf-8'))
         print(f"[Transformer] Loaded {len(skeleton_events)} skeleton events for constraint.")
     
     # Initialize Runner
     print(f"[Transformer] Initializing runner...")
     runner = DrumsTransformerRunner()
     
-    sample_map = {k.replace("_POOL", ""): v for k, v in json.loads(Path(args.pools_json).read_text()).items() if k.endswith("_POOL")}
+    sample_map = {k.replace("_POOL", ""): v for k, v in json.loads(Path(args.pools_json).read_text(encoding='utf-8')).items() if k.endswith("_POOL")}
     
     # Generate Candidates
     candidates = []

@@ -3,15 +3,26 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 require('dotenv').config({ path: __dirname + '/.env' });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/soundroutine';
 const JWT_SECRET = process.env.JWT_SECRET || 'soundroutine_secret_key';
+const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'http://127.0.0.1:8001';
 
 // Middleware
 app.use(cors());
+
+// Proxy model API (Flask) through Node
+app.use('/api', createProxyMiddleware({
+    target: MODEL_BASE_URL,
+    changeOrigin: true,
+    proxyTimeout: 300000,
+    timeout: 300000
+}));
+
 app.use(express.json());
 
 // MongoDB Connection

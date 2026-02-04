@@ -8,7 +8,7 @@ const PlayPreview = () => {
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
-    const [audioUrl, setAudioUrl] = useState<string>('');
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
@@ -19,7 +19,7 @@ const PlayPreview = () => {
             console.log("[PlayPreview] Setting audioUrl:", url);
             setAudioUrl(url);
         } else {
-            setAudioUrl('');
+            setAudioUrl(null);
         }
     }, [isConnected, grid]);
 
@@ -70,13 +70,15 @@ const PlayPreview = () => {
 
     return (
         <div className="h-16 bg-white border-t border-gray-200 flex items-center px-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 w-full">
-            <audio
-                ref={audioRef}
-                src={audioUrl}
-                onTimeUpdate={onTimeUpdate}
-                onEnded={handleEnded}
-                onLoadedMetadata={onLoadedMetadata}
-            />
+            {audioUrl ? (
+                <audio
+                    ref={audioRef}
+                    src={audioUrl}
+                    onTimeUpdate={onTimeUpdate}
+                    onEnded={handleEnded}
+                    onLoadedMetadata={onLoadedMetadata}
+                />
+            ) : null}
 
             {/* Transport Controls */}
             <div className="flex-1 flex items-center justify-center gap-4">

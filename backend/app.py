@@ -11,7 +11,41 @@ from typing import Any, Dict, Optional
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
-from model_loader import SoundRoutineModel
+from .model_loader import SoundRoutineModel
+
+
+def _ensure_cache_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def _ensure_hf_cache_env(project_root: Path) -> None:
+    cache_root = project_root / ".cache" / "hf"
+
+    hf_home = os.environ.get("HF_HOME")
+    if hf_home:
+        hf_home = hf_home.strip()
+        if not _ensure_cache_dir(Path(hf_home)):
+            hf_home = None
+
+    if not hf_home:
+        hf_home = str(cache_root)
+        _ensure_cache_dir(Path(hf_home))
+    os.environ["HF_HOME"] = hf_home
+
+    transformers_cache = os.environ.get("TRANSFORMERS_CACHE")
+    if transformers_cache:
+        transformers_cache = transformers_cache.strip()
+        if not _ensure_cache_dir(Path(transformers_cache)):
+            transformers_cache = None
+
+    if not transformers_cache:
+        transformers_cache = str(Path(hf_home) / "transformers")
+        _ensure_cache_dir(Path(transformers_cache))
+    os.environ["TRANSFORMERS_CACHE"] = transformers_cache
 
 
 def create_app() -> Flask:
@@ -21,6 +55,9 @@ def create_app() -> Flask:
     # ---- Paths (Project Root)
     PROJECT_ROOT = Path(__file__).resolve().parents[1]  # .../soundroutine
     DEFAULT_OUTS_DIR = PROJECT_ROOT / "outs"
+
+    # Ensure HF cache path exists (avoid invalid drive issues)
+    _ensure_hf_cache_env(PROJECT_ROOT)
 
     # ---- Singleton model/pipeline runner
     # FIX: Pass project_root

@@ -92,19 +92,29 @@ def main() -> None:
         # Update config and rebuild
         # We need to hackily update the frozen dataclass or just create new one
         # GridConfig is frozen? Let's assume we can re-instantiate.
-        new_gcfg = copy.deepcopy(grid.cfg)
-        # dataclass.replace or just simple modification if not frozen? 
-        # It's likely frozen. Let's assume we can map it.
-        # Check grid.py? It's better to just re-create GridConfig.
         from stage3_beat_grid.grid import GridConfig
+        from stage5_note_gen.types import Grid as Grid5
         new_gcfg = GridConfig(
-            bpm=grid.cfg.bpm,
+            bpm=grid.bpm,
             num_bars=needed_bars,
-            steps_per_bar=grid.cfg.steps_per_bar,
-            meter_numer=grid.cfg.meter_numer,
-            meter_denom=grid.cfg.meter_denom,
+            steps_per_bar=grid.steps_per_bar,
+            meter_numer=grid.meter_numer,
+            meter_denom=grid.meter_denom,
         )
-        grid = build_grid(new_gcfg)
+        grid_time = build_grid(new_gcfg)
+        # Convert GridTime back to stage5 Grid
+        grid = Grid5(
+            bpm=grid_time.cfg.bpm,
+            meter_numer=grid_time.cfg.meter_numer,
+            meter_denom=grid_time.cfg.meter_denom,
+            steps_per_bar=grid_time.cfg.steps_per_bar,
+            num_bars=grid_time.cfg.num_bars,
+            tbeat=grid_time.tbeat,
+            tbar=grid_time.tbar,
+            tstep=grid_time.tstep,
+            bar_start=list(grid_time.bar_start),
+            t_step=[list(row) for row in grid_time.t_step],
+        )
 
     base_loop_events = normalize_notes_to_event_grid(
         grid=grid,

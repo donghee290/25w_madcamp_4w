@@ -123,7 +123,7 @@ def main() -> None:
     # 2) Skeleton Generation (Constraint)
     pools = {}
     if args.pools_json and Path(args.pools_json).exists():
-        pools = json.loads(Path(args.pools_json).read_text())
+        pools = json.loads(Path(args.pools_json).read_text(encoding='utf-8'))
     
     # Default configs for now
     scfg = SkeletonConfig(

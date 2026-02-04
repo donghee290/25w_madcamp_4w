@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -22,7 +23,11 @@ def _run_step(project_root: Path, pipeline_dir: Path, step_name: str, cmd_args: 
     cmd = [sys.executable, str(pipeline_dir / step_name)] + cmd_args
     logger.info(f"[pipeline] Running {step_name} with args: {cmd_args}")
     print(f"[pipeline] Running {step_name} ...")
-    subprocess.check_call(cmd, cwd=str(project_root))
+    env = os.environ.copy()
+    for key in ("HF_HOME", "TRANSFORMERS_CACHE"):
+        if env.get(key):
+            env[key] = env[key].strip()
+    subprocess.check_call(cmd, cwd=str(project_root), env=env)
     print(f"[pipeline] {step_name} Success.")
 
 
@@ -488,14 +493,15 @@ class SoundRoutineModel:
             # Fallback: Check if file with suffix exists (e.g. _1.wav) or different ext
             # If key is latest_mp3, and file missing, try finding any .mp3 in final dir
             if p.parent.exists():
-                 candidates = list(p.parent.glob(f"*{kind}"))
-                 if candidates:
-                     return candidates[0]
-                 # Also try wav if mp3 requested but missing
-                 if kind == "mp3":
-                      candidates_wav = list(p.parent.glob("*.wav"))
-                      if candidates_wav:
-                          return candidates_wav[0]
+                candidates = list(p.parent.glob(f"*.{kind}"))
+                if candidates:
+                    # Return the latest by modified time
+                    return max(candidates, key=lambda c: c.stat().st_mtime)
+                # Also try wav if mp3 requested but missing
+                if kind == "mp3":
+                    candidates_wav = list(p.parent.glob("*.wav"))
+                    if candidates_wav:
+                        return max(candidates_wav, key=lambda c: c.stat().st_mtime)
 
         try:
             latest = self.get_latest_output(beat_name)
