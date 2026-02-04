@@ -47,6 +47,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         duration: 0
     });
 
+    // Global Modals
+    const [modalState, setModalState] = useState<{ type: 'PREVIEW' | 'DELETE' | null; data?: any }>({
+        type: null,
+        data: null
+    });
+
     // Polling ref
     const pollInterval = useRef<number | null>(null);
 
@@ -151,7 +157,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setUploadedFiles(prev => prev.map(f =>
                 newFiles.some(nf => nf.id === f.id) ? { ...f, status: 'done' } : f
             ));
-            await refreshState(); // Refresh state after upload (pools might be ready if sync)
+            await refreshState();
         } catch (e) {
             console.error(e);
             setUploadedFiles(prev => prev.map(f =>
@@ -163,11 +169,30 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
-    const generateBeat = async () => {
+    const handleRemove = async (filename: string) => {
+        if (!beatName) return;
+
+        // Optimistic Remove
+        setUploadedFiles(prev => prev.filter(f => f.name !== filename));
+
+        try {
+            await beatApi.deleteFile(beatName, filename);
+            await refreshState();
+        } catch (e) {
+            console.error(e);
+            alert("Remove failed");
+            // Revert on fail? For now relying on refreshState or just alert.
+            await refreshState();
+        }
+    };
+
+    const generateBeat = async (customName?: string) => {
         if (!beatName) return;
         setIsGenerating(true);
         try {
-            const res = await beatApi.generateInitial(beatName, config);
+            // Include beat_title in config if provided
+            const finalConfig = customName ? { ...config, beat_title: customName } : config;
+            const res = await beatApi.generateInitial(beatName, finalConfig);
             if (res.ok && res.job_id) {
                 setJobId(res.job_id); // Start polling
             } else {
@@ -227,13 +252,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         createBeat,
         uploadFiles: handleUpload,
+        removeFile: handleRemove,
         generateBeat,
         regenerate,
         updateConfig,
         downloadUrl,
 
         playbackState,
-        setPlaybackState
+        setPlaybackState,
+
+        modalState,
+        setModalState
     };
 
     return (

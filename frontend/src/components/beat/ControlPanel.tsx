@@ -15,7 +15,6 @@ const ControlPanel = () => {
             {/* Header */}
             <div className="h-16 flex items-center px-6 border-b border-gray-100">
                 <h2 className="text-lg font-bold flex items-center gap-2">
-                    <Sliders className="w-4 h-4" />
                     Controls
                 </h2>
             </div>
@@ -44,7 +43,6 @@ const ControlPanel = () => {
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Style</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 font-medium text-gray-700 capitalize flex justify-between items-center">
                         {config.style}
-                        <Settings className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
                     </div>
                 </div>
 
@@ -62,7 +60,6 @@ const ControlPanel = () => {
                             <option value="flac">FLAC</option>
                             <option value="ogg">OGG</option>
                         </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
                 </div>
 
@@ -72,7 +69,6 @@ const ControlPanel = () => {
                 {/* Actions */}
                 <div className="space-y-4">
                     <button className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                        <Save className="w-4 h-4" />
                         Save Project
                     </button>
                 </div>
@@ -85,7 +81,6 @@ const ControlPanel = () => {
                     download
                     className="w-full py-4 bg-black hover:bg-gray-800 text-white rounded-xl font-bold text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
-                    <Download className="w-4 h-4" />
                     Download {exportFormat.toUpperCase()}
                 </a>
             </div>

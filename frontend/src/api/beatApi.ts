@@ -11,6 +11,7 @@ export interface ProjectState {
         progressive: boolean;
         repeat_full: number;
         export_format?: "wav" | "mp3" | "flac" | "ogg" | "m4a";
+        beat_title?: string;
         [key: string]: any;
     };
     latest_s1_dir?: string;
@@ -99,6 +100,14 @@ export const beatApi = {
             body: formData,
         });
         if (!res.ok) throw new Error('Upload failed');
+        return res.json();
+    },
+
+    async deleteFile(beatName: string, filename: string): Promise<{ ok: boolean; error?: string }> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/files/${filename}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Delete failed');
         return res.json();
     },
 

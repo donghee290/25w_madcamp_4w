@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, List
 # Logger setup
 logger = logging.getLogger(__name__)
 
-AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".webm"}
 
 
 def _run_step(project_root: Path, pipeline_dir: Path, step_name: str, cmd_args: list[str]) -> None:
@@ -429,7 +429,15 @@ class SoundRoutineModel:
             if not editor_events: editor_events = str(_get_latest_file(dirs["s6"], "event_grid_*.json"))
             if not sample_root: sample_root = str(_get_latest_stage_dir(dirs["s1"], "stage1_"))
 
-            name = f"{beat_name}_final"
+            # Determine Output Name
+            custom_title = config.get("beat_title")
+            if custom_title:
+                # Sanitize title simply (remove spaces etc if needed, or keeping it raw if pipeline handles it)
+                # Ideally replace spaces with underscores for safety
+                safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in custom_title)
+                name = f"{safe_title}_final"
+            else:
+                name = f"{beat_name}_final"
             _run_step(self.project_root, self.pipeline_dir, "step7_run_render_final.py", [
                 "--grid_json", str(grid_json),
                 "--event_grid_json", str(editor_events),

@@ -72,7 +72,7 @@ def create_app() -> Flask:
         for f in files:
             if not f.filename: continue
             suffix = Path(f.filename).suffix.lower()
-            if suffix not in {".wav", ".mp3", ".flac", ".ogg", ".m4a"}:
+            if suffix not in {".wav", ".mp3", ".m4a", ".webm"}:
                 continue
             
             out_path = upload_dir / Path(f.filename).name
@@ -82,9 +82,23 @@ def create_app() -> Flask:
         if not saved:
             return jsonify({"ok": False, "error": "No valid files saved"}), 400
 
-        # Update state with uploads_dir
         app.model.update_state(beat_name, {"uploads_dir": str(upload_dir)}) # type: ignore
         return jsonify({"ok": True, "count": len(saved)})
+
+    @app.delete("/api/beats/<beat_name>/files/<filename>")
+    def delete_file(beat_name: str, filename: str):
+        """Deletes a specific file from the uploads directory."""
+        upload_dir = DEFAULT_OUTS_DIR / beat_name / "uploads"
+        file_path = upload_dir / filename
+        
+        if file_path.exists() and file_path.is_file():
+            try:
+                file_path.unlink()
+                return jsonify({"ok": True})
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 500
+        else:
+            return jsonify({"ok": False, "error": "File not found"}), 404
 
     @app.post("/api/beats/<beat_name>/generate/initial")
     def generate_initial(beat_name: str):
@@ -259,7 +273,7 @@ def create_app() -> Flask:
         for f in files:
             if not f.filename: continue
             suffix = Path(f.filename).suffix.lower()
-            if suffix not in {".wav", ".mp3", ".flac", ".ogg", ".m4a"}:
+            if suffix not in {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".webm"}:
                 return jsonify({"ok": False, "error": f"Unsupported extension: {suffix}"}), 400
             
             out_path = input_dir / Path(f.filename).name

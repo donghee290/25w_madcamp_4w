@@ -66,11 +66,13 @@ export interface ProjectContextState {
     // Actions
     createBeat: () => Promise<void>;
     uploadFiles: (files: File[]) => Promise<void>;
-    generateBeat: () => Promise<void>;
+    removeFile: (filename: string) => Promise<void>;
+    generateBeat: (customName?: string) => Promise<void>;
     regenerate: (fromStage: number, params?: Partial<PipelineConfig>) => Promise<void>;
     updateConfig: (updates: Partial<PipelineConfig>) => Promise<void>;
     downloadUrl: (format?: string) => string;
 
+    // Playback Sync
     // Playback Sync
     playbackState: {
         isPlaying: boolean;
@@ -78,4 +80,11 @@ export interface ProjectContextState {
         duration: number;
     };
     setPlaybackState: (state: { isPlaying: boolean; currentTime: number; duration: number }) => void;
+
+    // Global Modals
+    modalState: {
+        type: 'PREVIEW' | 'DELETE' | null;
+        data?: any; // File for preview, filename string for delete
+    };
+    setModalState: (state: { type: 'PREVIEW' | 'DELETE' | null; data?: any }) => void;
 }
