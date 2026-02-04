@@ -9,7 +9,7 @@ from .jwt_handler import (
     get_current_user,
     revoke_refresh_token
 )
-from .models import User
+from ..db.models import User
 
 __all__ = [
     "google_oauth_bp",

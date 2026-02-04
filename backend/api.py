@@ -1357,7 +1357,7 @@ POST   /api/projects/:id/generate - 비트 생성</pre>
 # ============================================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("🎵 SoundRoutine Backend API Server")
+    print("SoundRoutine Backend API Server")
     print("=" * 60)
     print(f"EXTERNAL_BASE_URL: {EXTERNAL_BASE_URL}")
     print(f"GOOGLE_CLIENT_ID: {GOOGLE_CLIENT_ID[:30]}..." if GOOGLE_CLIENT_ID else "GOOGLE_CLIENT_ID: NOT SET")
