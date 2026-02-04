@@ -234,7 +234,10 @@ class SoundRoutineModel:
         seed = int(config.get("seed", 42))
         style = str(config.get("style", "rock"))
         progressive = bool(config.get("progressive", True))
-        repeat_full = int(config.get("repeat_full", 8))
+        repeat_full = int(config.get("repeat_full", 2))
+        # FIX: Legacy state might have 8. Force clamp to 2 for progressive structure correctness.
+        if progressive and repeat_full > 2:
+             repeat_full = 2
 
         # Output Dirs
         dirs = {

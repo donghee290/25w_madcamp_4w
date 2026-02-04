@@ -137,7 +137,19 @@ def main() -> None:
             final_repeat=int(args.repeat_full),
             base_loop_len=base_grid_bars,
         )
-        final_grid, final_events, final_meta = build_progressive_timeline(grid, base_loop_events, pcfg)
+
+        # Extract available roles from pools (e.g. CORE_POOL -> CORE)
+        available_pool_roles = []
+        for k, v in pools.items():
+            if k.endswith("_POOL") and isinstance(v, list) and len(v) > 0:
+                available_pool_roles.append(k.replace("_POOL", "").upper())
+
+        final_grid, final_events, final_meta = build_progressive_timeline(
+            grid, 
+            base_loop_events, 
+            pcfg,
+            available_pool_roles=available_pool_roles
+        )
         
         # We also save the base loop for reference
         loop_ver = get_next_version(out_dir, prefix="event_grid_loop")

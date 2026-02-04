@@ -262,7 +262,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setPlaybackState,
 
         modalState,
-        setModalState
+        setModalState,
+        setRolePools
     };
 
     return (

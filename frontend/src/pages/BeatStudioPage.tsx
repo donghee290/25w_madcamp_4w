@@ -1,4 +1,5 @@
 import InputMaterial from "../components/beat/InputMaterial";
+import SoundMaterial from "../components/beat/SoundMaterial";
 import BeatCanvas from "../components/beat/BeatCanvas";
 import ControlPanel from "../components/beat/ControlPanel";
 import PlayPreview from "../components/beat/PlayPreview";
@@ -50,11 +51,16 @@ export default function BeatStudioPage() {
         }
     };
 
+
     return (
         <div className="flex h-screen bg-white font-sans text-gray-900 overflow-hidden">
-            {/* 1. Left Sidebar (Sound Material) */}
+            {/* 1. Left Sidebar (Sound Material or Input Material) */}
             <div className="flex flex-col h-full border-r border-gray-200 shadow-xl z-20">
-                <InputMaterial disabled={isMaterialDisabled} />
+                {hasResult ? (
+                    <SoundMaterial disabled={isGenerating} />
+                ) : (
+                    <InputMaterial disabled={isMaterialDisabled} />
+                )}
             </div>
 
             {/* Middle + Right Area Wrapper */}

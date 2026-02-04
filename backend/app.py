@@ -110,7 +110,7 @@ def create_app() -> Flask:
             "seed": int(data.get("seed", 42)),
             "style": str(data.get("style", "rock")),
             "progressive": bool(data.get("progressive", True)),
-            "repeat_full": int(data.get("repeat_full", 8)),
+            "repeat_full": int(data.get("repeat_full", 2)),
         }
         
         # Save config first
@@ -199,7 +199,17 @@ def create_app() -> Flask:
         if pools_path and os.path.exists(pools_path):
             try:
                 with open(pools_path, "r") as f:
-                    state["pools_content"] = json.load(f)
+                    raw_pools = json.load(f)
+                    # Transform for Frontend: keys "CORE_POOL" -> "CORE", values [{...}] -> ["filename"]
+                    transformed_pools = {}
+                    for k, v in raw_pools.items():
+                        if k.endswith("_POOL"):
+                            role_name = k.replace("_POOL", "")
+                            # v is list of dicts, we want list of sample_ids (filenames)
+                            if isinstance(v, list):
+                                transformed_pools[role_name] = [item.get("sample_id") for item in v if isinstance(item, dict)]
+                    
+                    state["pools_content"] = transformed_pools
             except Exception as e:
                 print(f"Error reading pools: {e}")
 
@@ -326,6 +336,44 @@ def create_app() -> Flask:
             download_name=file_path.name,
             mimetype=f"audio/{kind}" if kind != "m4a" else "audio/mp4",
         )
+
+    @app.get("/api/beats/<beat_name>/samples/<filename>")
+    def get_sample(beat_name: str, filename: str):
+        """Serves a specific sample from the 1_preprocess directory."""
+        if ".." in filename or filename.startswith("/"):
+             return jsonify({"ok": False, "error": "Invalid filename"}), 400
+             
+        try:
+            state = app.model.get_state(beat_name) # type: ignore
+            s1_dir = state.get("latest_s1_dir")
+            
+            if not s1_dir or not os.path.exists(s1_dir):
+                 return jsonify({"ok": False, "error": "Preprocess directory not found"}), 404
+            
+            target_path = Path(s1_dir) / filename
+            if not target_path.exists():
+                target_path = Path(s1_dir) / "samples" / filename
+            
+            # If not found, try appending common extensions (sample_id usually lacks extension)
+            if not target_path.exists():
+                for ext in [".wav", ".mp3", ".m4a", ".webm", ".flac"]:
+                    candidate = target_path.with_name(f"{filename}{ext}")
+                    if candidate.exists():
+                        target_path = candidate
+                        break
+                    # Also try in samples subdir with extension
+                    candidate_sub = (Path(s1_dir) / "samples" / f"{filename}{ext}")
+                    if candidate_sub.exists():
+                        target_path = candidate_sub
+                        break
+
+            if not target_path.exists():
+                return jsonify({"ok": False, "error": "File not found"}), 404
+                
+            return send_file(target_path, max_age=0)
+            
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
     return app
 

@@ -113,6 +113,7 @@ def build_progressive_timeline(
     base_grid: Grid,
     base_events: List[Event],
     cfg: ProgressiveConfig,
+    available_pool_roles: List[str] = None,
 ) -> Tuple[Grid, List[Event], Dict[str, Any]]:
     """
     요구사항:
@@ -136,8 +137,13 @@ def build_progressive_timeline(
         }
         return base_grid, base_events, meta
 
-    # 진행 순서는 config를 따름 (존재하지 않아도 단계 생성 -> 빈 공간 확보하여 구조 유지)
-    effective_layers = list(cfg.layers)
+    # 진행 순서는 config를 따르되, 실제로 사용 가능한 리소스(Pool)가 있거나 이벤트가 존재하는 레이어만 진행
+    # (예: Texture가 풀에도 없고 이벤트도 없으면 스킵. 풀에라도 있으면 섹션 생성)
+    event_roles = set(str(e.role).upper() for e in base_events)
+    pool_roles = set(r.upper() for r in (available_pool_roles or []))
+    available_roles = event_roles.union(pool_roles)
+
+    effective_layers = [L for L in cfg.layers if L.upper() in available_roles]
 
     # 누적 허용 role set을 단계별로 확장
     allowed: set[str] = set()

@@ -97,11 +97,16 @@ const BeatCanvas = () => {
 
                         {/* Step Markers (Header) */}
                         <div className="flex h-6 mb-1 border-b border-gray-200">
-                            {Array.from({ length: stepsPerBar }).map((_, i) => (
-                                <div key={i} className={`flex-1 flex items-center justify-center text-[10px] text-gray-400 font-mono ${i % 4 === 0 ? 'font-bold text-gray-600' : ''}`}>
-                                    {(i % 4) + 1}
-                                </div>
-                            ))}
+                            {Array.from({ length: stepsPerBar }).map((_, i) => {
+                                const sub = i % 4;
+                                const beat = Math.floor(i / 4) + 1;
+                                const label = sub === 0 ? beat : sub === 1 ? 'e' : sub === 2 ? '&' : 'a';
+                                return (
+                                    <div key={i} className={`flex-1 flex items-center justify-center text-[10px] font-mono ${sub === 0 ? 'font-bold text-gray-800' : 'text-gray-400'}`}>
+                                        {label}
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* Lanes */}

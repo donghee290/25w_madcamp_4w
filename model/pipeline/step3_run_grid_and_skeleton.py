@@ -131,7 +131,7 @@ def main() -> None:
         steps_per_bar=16,
         num_bars=int(args.bars),
         pattern_style=args.style,
-        fill_prob=0.3, 
+        fill_prob=1.0,  # Force fill generation (User Requirement: 100%) 
         texture_enabled=True
     )
     

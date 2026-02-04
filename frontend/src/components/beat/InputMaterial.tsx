@@ -124,9 +124,9 @@ const InputMaterial: React.FC<InputMaterialProps> = ({ disabled = false }) => {
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {/* Uploaded Files (Filled Slots) */}
-                    {uploadedFiles.map((file) => (
+                    {uploadedFiles.map((file, idx) => (
                         <FilledSlot
-                            key={file.id}
+                            key={`${file.id}-${idx}`}
                             file={file}
                             rolePools={rolePools}
                             onRemove={() => initiateRemove(file.name)}

@@ -237,7 +237,9 @@ def build_skeleton_events(
         if cfg.fill_every_n_bars <= 1:
             do_fill = (rng.random() < cfg.fill_prob)
         else:
-            do_fill = (cfg.num_bars % cfg.fill_every_n_bars == 0) and (rng.random() < cfg.fill_prob)
+            # e.g. 4 bars total, fill_every_n_bars=4 -> 4%4==0 -> True
+            is_fill_bar = (cfg.num_bars % cfg.fill_every_n_bars == 0)
+            do_fill = is_fill_bar and (rng.random() < cfg.fill_prob)
 
         if do_fill:
             feats = fill_sample.get("features", {})

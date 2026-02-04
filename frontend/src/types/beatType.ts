@@ -87,4 +87,5 @@ export interface ProjectContextState {
         data?: any; // File for preview, filename string for delete
     };
     setModalState: (state: { type: 'PREVIEW' | 'DELETE' | null; data?: any }) => void;
+    setRolePools: (pools: Record<RoleType, string[]>) => void;
 }

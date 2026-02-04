@@ -159,5 +159,9 @@ export const beatApi = {
     // Legacy / Convenience
     getDownloadUrl(beatName: string, kind: string = 'mp3'): string {
         return `${API_BASE}/api/beats/${beatName}/download?kind=${kind}`;
+    },
+
+    getSampleUrl(beatName: string, filename: string): string {
+        return `${API_BASE}/api/beats/${beatName}/samples/${filename}`;
     }
 };

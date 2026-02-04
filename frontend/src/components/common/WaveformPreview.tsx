@@ -44,8 +44,16 @@ const WaveformPreview: React.FC<WaveformPreviewProps> = ({ file }) => {
         reader.readAsArrayBuffer(file);
 
         // Bind Audio Events
-        audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
-        audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
+        const updateDur = () => {
+            if (!isNaN(audio.duration) && audio.duration !== Infinity) {
+                setDuration(audio.duration);
+            }
+        };
+        audio.addEventListener('loadedmetadata', updateDur);
+        // Force check in case it loaded instantly
+        if (audio.readyState >= 1) updateDur();
+
+        // audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime)); // Handled by rAF
         audio.addEventListener('ended', () => setIsPlaying(false));
         audio.addEventListener('play', () => setIsPlaying(true));
         audio.addEventListener('pause', () => setIsPlaying(false));
@@ -129,6 +137,7 @@ const WaveformPreview: React.FC<WaveformPreviewProps> = ({ file }) => {
     const seek = (seconds: number) => {
         if (audioRef.current) {
             audioRef.current.currentTime = Math.min(Math.max(audioRef.current.currentTime + seconds, 0), duration);
+            setCurrentTime(audioRef.current.currentTime);
         }
     };
 
@@ -137,44 +146,112 @@ const WaveformPreview: React.FC<WaveformPreviewProps> = ({ file }) => {
         if (!audioRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const percent = x / rect.width;
-        audioRef.current.currentTime = percent * duration;
+        const percent = Math.min(Math.max(0, x / rect.width), 1);
+
+        const newTime = percent * duration;
+        if (isFinite(newTime)) {
+            audioRef.current.currentTime = newTime;
+            setCurrentTime(newTime);
+            // Play immediately on click
+            if (audioRef.current.paused) {
+                audioRef.current.play().catch(e => console.error("Play failed", e));
+                setIsPlaying(true);
+            }
+        }
     };
 
-    // Formatted time
+    // Formatted time (Decimal for short samples)
     const formatTime = (t: number) => {
+        if (!t || isNaN(t)) return "0.00s";
+        if (duration < 60) {
+            return t.toFixed(2) + 's';
+        }
         const m = Math.floor(t / 60);
         const s = Math.floor(t % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
+    // Smooth Playhead Animation
+    const rafRef = useRef<number | null>(null);
+    const animate = () => {
+        if (audioRef.current) {
+            setCurrentTime(audioRef.current.currentTime);
+            if (!audioRef.current.paused) {
+                rafRef.current = requestAnimationFrame(animate);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (isPlaying) {
+            rafRef.current = requestAnimationFrame(animate);
+        } else {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            // Sync one last time
+            if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+        }
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, [isPlaying]);
+
     // Progress Overlay Width
-    const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const progressPercent = (duration > 0 && isFinite(duration))
+        ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
+        : 0;
 
     return (
         <div className="w-full">
             <p className="font-bold mb-2 truncate text-sm">{file.name}</p>
 
-            {/* Waveform Container */}
+            {/* Waveform Wrapper */}
             <div
-                ref={containerRef}
-                className="relative w-full h-32 bg-gray-700 rounded-lg overflow-hidden cursor-pointer group"
+                className="w-full h-32 cursor-pointer group mb-1"
+                style={{ position: 'relative' }}
                 onClick={handleCanvasClick}
             >
-                <canvas
-                    ref={canvasRef}
-                    className="w-full h-full block"
-                    style={{ width: '100%', height: '100%' }}
-                />
-
-                {/* Playhead Overlay */}
+                {/* Inner Canvas Container (Clipped) */}
                 <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] pointer-events-none transition-all duration-75 ease-linear z-10"
-                    style={{ left: `${progressPercent}%` }}
+                    ref={containerRef}
+                    className="w-full h-full bg-gray-700 rounded-lg overflow-hidden"
+                    style={{ position: 'relative' }}
+                >
+                    <canvas
+                        ref={canvasRef}
+                        className="w-full h-full block"
+                        style={{ width: '100%', height: '100%' }}
+                    />
+                </div>
+
+                {/* Playhead Overlay - Enhanced Visibility */}
+                <div
+                    className="pointer-events-none"
+                    style={{
+                        position: 'absolute',
+                        zIndex: 50,
+                        top: 0,
+                        bottom: 0,
+                        left: `${progressPercent}%`,
+                        width: '3px',
+                        height: '100%',
+                        backgroundColor: '#FFFFFF'
+                    }}
                 />
 
-                {/* Duration text */}
-                <div className="absolute bottom-1 right-2 text-[10px] text-white/80 font-mono pointer-events-none">
+                {/* Duration text - MOVED OUTSIDE OVERFLOW-HIDDEN */}
+                <div
+                    className="font-mono pointer-events-none rounded px-2 py-1 shadow-sm border border-gray-200"
+                    style={{
+                        position: 'absolute',
+                        zIndex: 30,
+                        bottom: '8px',
+                        right: '8px',
+                        backgroundColor: 'white',
+                        color: 'black',
+                        fontSize: '10px',
+                        fontWeight: 'bold'
+                    }}
+                >
                     {formatTime(currentTime)} / {formatTime(duration)}
                 </div>
             </div>
