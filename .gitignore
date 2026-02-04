@@ -24,6 +24,9 @@ input_samples/
 # System
 .DS_Store
 
+# Backup
+backup_2026-02-04/
+
 # Distribution / packaging
 build/
 dist/
