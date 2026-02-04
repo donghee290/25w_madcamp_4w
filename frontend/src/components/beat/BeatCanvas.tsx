@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import type { RoleType } from '../../types/beatType';
 
@@ -13,7 +14,16 @@ const ROLE_COLORS: Record<RoleType, string> = {
 const ROW_ORDER: RoleType[] = ['CORE', 'ACCENT', 'MOTION', 'FILL', 'TEXTURE'];
 
 const BeatCanvas = () => {
-    const { grid } = useProject();
+    const { grid, playbackState } = useProject();
+
+    // DEBUG: Check events
+    useEffect(() => {
+        if (grid?.events) {
+            console.log("[BeatCanvas] Received events:", grid.events.length, grid.events);
+        } else {
+            console.log("[BeatCanvas] No events in grid");
+        }
+    }, [grid]);
 
     if (!grid) {
         return (
@@ -28,8 +38,12 @@ const BeatCanvas = () => {
 
     // Grid Params
     const { bars, stepsPerBar } = grid;
-    // totalSteps = bars * stepsPerBar; usually 128 (8 bars * 16) or similar.
-    // We render Bar by Bar for layout
+
+    // Calculate Playhead Position
+    const safeBpm = grid.bpm || 120;
+    const secPerStep = (60 / safeBpm) / 4;
+    // Current step in floating point
+    const currentStep = playbackState.currentTime / secPerStep;
 
     const renderBar = (barIndex: number) => {
         const startStep = barIndex * stepsPerBar;
@@ -38,8 +52,14 @@ const BeatCanvas = () => {
         // Filter events for this bar
         const barEvents = grid.events.filter(e => e.step >= startStep && e.step < endStep);
 
+        // Playhead local calculation
+        const isPlayheadInBar = currentStep >= startStep && currentStep < endStep;
+        const playheadOffsetPercent = isPlayheadInBar
+            ? ((currentStep - startStep) / stepsPerBar) * 100
+            : 0;
+
         return (
-            <div key={barIndex} className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            <div key={barIndex} className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
                 {/* Bar Header */}
                 <div className="flex items-center mb-3">
                     <span className="font-mono text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">
@@ -62,6 +82,14 @@ const BeatCanvas = () => {
 
                     {/* Grid Cells */}
                     <div className="relative">
+                        {/* Playhead Overlay */}
+                        {isPlayheadInBar && (
+                            <div
+                                className="absolute top-8 bottom-0 w-0.5 bg-yellow-400 z-10 shadow-[0_0_10px_rgba(250,204,21,0.8)] pointer-events-none transition-all duration-75 ease-linear"
+                                style={{ left: `${playheadOffsetPercent}%` }}
+                            />
+                        )}
+
                         {/* Step Markers (Header) */}
                         <div className="flex h-6 mb-1 border-b border-gray-200">
                             {Array.from({ length: stepsPerBar }).map((_, i) => (
@@ -90,7 +118,15 @@ const BeatCanvas = () => {
                                             <div key={stepOffset} className="flex-1 p-0.5 border-r border-transparent">
                                                 {event && (
                                                     <div
-                                                        className={`w-full h-full rounded shadow-sm hover:scale-110 transition-transform cursor-pointer ${ROLE_COLORS[role]}`}
+                                                        className={`w-full h-full rounded shadow-sm hover:scale-110 transition-transform cursor-pointer`}
+                                                        style={{
+                                                            backgroundColor: role === 'CORE' ? 'red' :
+                                                                role === 'ACCENT' ? 'gold' :
+                                                                    role === 'MOTION' ? 'blue' : 'green',
+                                                            minHeight: '20px',
+                                                            width: '100%',
+                                                            display: 'block'
+                                                        }}
                                                         title={`Step: ${currentStep}, Vel: ${event.velocity}`}
                                                     ></div>
                                                 )}

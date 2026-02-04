@@ -457,6 +457,55 @@ class SoundRoutineModel:
             "elapsed_sec": elapsed
         }
 
+    def convert_output(self, project_name: str, kind: str) -> Path:
+        """
+        Returns the path to the requested audio format.
+        Used for on-demand download/preview.
+        valid kinds: mp3, wav, flac, ogg, m4a
+        """
+        # For now, we only trust what's in state or what we can find in s7
+        state = self.get_state(project_name)
+        
+        # 1. Check if we already have it in state
+        # e.g. state["latest_mp3"], state["latest_wav"]
+        key = f"latest_{kind}"
+        if state.get(key):
+            p = Path(state[key])
+            if p.exists():
+                return p
+            # Fallback: Check if file with suffix exists (e.g. _1.wav) or different ext
+            # If key is latest_mp3, and file missing, try finding any .mp3 in final dir
+            if p.parent.exists():
+                 candidates = list(p.parent.glob(f"*{kind}"))
+                 if candidates:
+                     return candidates[0]
+                 # Also try wav if mp3 requested but missing
+                 if kind == "mp3":
+                      candidates_wav = list(p.parent.glob("*.wav"))
+                      if candidates_wav:
+                          return candidates_wav[0]
+
+        try:
+            latest = self.get_latest_output(project_name)
+            path_str = latest.get(f"{kind}_path")
+            if path_str:
+                p = Path(path_str)
+                if p.exists():
+                    return p
+        except FileNotFoundError:
+            pass
+
+        # 3. If still not found, we might need to convert.
+        # Check if we have a master wav to convert from.
+        # implementation for on-demand conversion omitted for now, 
+        # assume if it's not generated, we can't give it (or return 404 upstream).
+        # We will at least try to return the wav/mp3 if that's what they asked.
+        
+        # If they asked for 'ogg' but we only have 'wav', we would convert here.
+        # For this fix, we just want to suppress the error if they ask for mp3/wav which SHOULD exist.
+        
+        raise FileNotFoundError(f"Could not find or convert output for {kind}")
+
     def get_latest_output(self, project_name: str) -> Dict:
         # Prefer state.json
         state = self.get_state(project_name)

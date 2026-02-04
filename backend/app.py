@@ -122,6 +122,61 @@ def create_app() -> Flask:
             try:
                 with open(grid_path, "r") as f:
                     state["grid_content"] = json.load(f)
+                
+                # FIX: Also load event_grid if available and merge into grid_content
+                # The frontend expects 'events' inside grid object.
+                event_path = state.get("latest_event_grid_json") or state.get("latest_editor_json")
+                if event_path and os.path.exists(event_path):
+                     with open(event_path, "r") as f:
+                        events_data = json.load(f)
+                        raw_events = []
+                        if isinstance(events_data, list):
+                            raw_events = events_data
+                        elif isinstance(events_data, dict) and "events" in events_data:
+                            raw_events = events_data["events"]
+                        
+                        # --- FIX: Transform events for Frontend (BeatCanvas) ---
+                        # Frontend expects: { step: absolute, velocity: 0-127, role: ... }
+                        # Backend typically has: { bar: 0, step: 0-15, vel: 0.0-1.0 }
+                        steps_per_bar = state["grid_content"].get("steps_per_bar", 16)
+                        
+                        # Fix: Ensure frontend keys exist
+                        if "bars" not in state["grid_content"] and "num_bars" in state["grid_content"]:
+                            state["grid_content"]["bars"] = state["grid_content"]["num_bars"]
+                        if "stepsPerBar" not in state["grid_content"]:
+                            state["grid_content"]["stepsPerBar"] = steps_per_bar
+
+                        transformed_events = []
+                        for e in raw_events:
+                            # 1. Calc absolute step
+                            # If 'bar' is present, use it. If not, assume 'step' is already absolute?
+                            # Usually backend 'event_grid' has bar/step.
+                            if "bar" in e:
+                                abs_step = e["bar"] * steps_per_bar + e["step"]
+                            else:
+                                abs_step = e["step"]
+
+                            # 2. Velocity scaling
+                            # Backend 'vel' is 0.0-1.0 usually
+                            vel = e.get("vel", e.get("velocity", 0.8))
+                            if isinstance(vel, float) and vel <= 1.0:
+                                final_vel = int(vel * 127)
+                            else:
+                                final_vel = int(vel)
+                            
+                            # 3. Construct new event
+                            new_e = {
+                                "step": abs_step,
+                                "role": e["role"],
+                                "velocity": final_vel,
+                                "duration": e.get("dur_steps", e.get("duration", 1)),
+                                "sampleId": e.get("sample_id"),
+                                "offset": e.get("micro_offset_ms", 0)
+                            }
+                            transformed_events.append(new_e)
+
+                        state["grid_content"]["events"] = transformed_events
+                            
             except Exception as e:
                 print(f"Error reading grid: {e}")
 
@@ -251,7 +306,9 @@ def create_app() -> Flask:
         try:
             # On-demand conversion
             file_path = app.model.convert_output(project_name, kind) # type: ignore
+            print(f"[DEBUG] Serving {file_path} for {project_name} ({kind})")
         except Exception as e:
+            print(f"[DEBUG] Download error: {e}")
             return jsonify({"ok": False, "error": str(e)}), 404
 
         return send_file(

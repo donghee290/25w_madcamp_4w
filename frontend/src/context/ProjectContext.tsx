@@ -187,9 +187,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch { }
 
     const downloadUrl = (format: string = 'mp3') => {
-        if (!projectName) return '';
-        return beatApi.getDownloadUrl(projectName, format);
+        if (!projectName) {
+            console.warn("[ProjectContext] downloadUrl called but projectName is empty");
+            return '';
+        }
+        const url = beatApi.getDownloadUrl(projectName, format);
+        // console.log("[ProjectContext] Generated downloadUrl:", url);
+        return url;
     };
+
+    // Playhead Sync
+    const [playbackState, setPlaybackState] = useState<{ isPlaying: boolean; currentTime: number; duration: number }>({
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0
+    });
 
     return (
         <ProjectContext.Provider value={{
@@ -206,7 +218,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             generateInitial,
             regenerate,
             updateConfig: updateConfigHandler,
-            downloadUrl
+            downloadUrl,
+            playbackState,
+            setPlaybackState
         }}>
             {children}
         </ProjectContext.Provider>

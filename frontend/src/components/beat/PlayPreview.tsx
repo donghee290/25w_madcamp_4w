@@ -3,7 +3,7 @@ import { useProject } from '../../context/ProjectContext';
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
 const PlayPreview = () => {
-    const { grid, isConnected, downloadUrl } = useProject();
+    const { grid, isConnected, downloadUrl, setPlaybackState } = useProject();
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -15,7 +15,11 @@ const PlayPreview = () => {
     // Fetch MP3 URL when available
     useEffect(() => {
         if (isConnected) {
-            setAudioUrl(downloadUrl('mp3'));
+            const url = downloadUrl('mp3');
+            console.log("[PlayPreview] Setting audioUrl:", url, "isConnected:", isConnected);
+            setAudioUrl(url);
+        } else {
+            console.log("[PlayPreview] Not connected yet.");
         }
     }, [isConnected, grid]);
 
@@ -28,18 +32,32 @@ const PlayPreview = () => {
             audioRef.current.play().catch(e => console.error("Play failed", e));
         }
         setIsPlaying(!isPlaying);
+
+        // Sync to context immediately
+        setPlaybackState({ isPlaying: !isPlaying, currentTime, duration });
     };
 
     const onTimeUpdate = () => {
         if (audioRef.current) {
-            setCurrentTime(audioRef.current.currentTime);
-            setDuration(audioRef.current.duration || 0);
+            const curr = audioRef.current.currentTime;
+            const dur = audioRef.current.duration || 0;
+            setCurrentTime(curr);
+            setDuration(dur);
+            // Sync to context
+            setPlaybackState({ isPlaying: !audioRef.current.paused, currentTime: curr, duration: dur });
         }
     };
 
     const handleEnded = () => {
         setIsPlaying(false);
         setCurrentTime(0);
+        setPlaybackState({ isPlaying: false, currentTime: 0, duration });
+    };
+
+    const onLoadedMetadata = () => {
+        if (audioRef.current) {
+            setDuration(audioRef.current.duration);
+        }
     };
 
     const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
