@@ -1,0 +1,280 @@
+/* Signup Page Styles */
+
+.signup-container {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f8f8f8;
+    padding: 20px;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Doodle Background Pattern */
+.signup-container::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M30 40 L33 48 L42 48 L35 53 L38 62 L30 56 L22 62 L25 53 L18 48 L27 48 Z'/%3E%3Ccircle cx='150' cy='30' r='8'/%3E%3Ctext x='40' y='150' font-size='24' fill='%23888'%3E♪%3C/text%3E%3Ctext x='160' y='180' font-size='20' fill='%23888'%3E♫%3C/text%3E%3C/g%3E%3C/svg%3E"),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpath d='M40 60 C40 50 50 45 55 55 C60 45 70 50 70 60 C70 75 55 85 55 85 C55 85 40 75 40 60'/%3E%3Ccircle cx='80' cy='130' r='12'/%3E%3Ctext x='20' y='130' font-size='22' fill='%23999'%3E☆%3C/text%3E%3C/g%3E%3C/svg%3E");
+    background-size: 400px 400px, 360px 360px;
+    background-position: 0 0, 50px 80px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Header */
+.signup-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 20px 40px;
+    z-index: 10;
+}
+
+.signup-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.signup-header .logo-icon-img {
+    width: 36px;
+    height: auto;
+}
+
+.signup-header .logo-text {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a1a1a;
+    font-family: 'Fredoka', sans-serif;
+    text-shadow: 2px 2px 0 #ffd700;
+}
+
+/* Title Image */
+.signup-title-text {
+    font-size: 64px;
+    color: white;
+    font-family: 'Fredoka One', cursive;
+    /* Fredoka One 적용 */
+    -webkit-text-stroke: 3px black;
+    text-shadow: 5px 5px 0 #87ceeb;
+    margin-top: 60px;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 10;
+    letter-spacing: 1px;
+}
+
+.signup-title-img {
+    width: 400px;
+    max-width: 90%;
+    height: auto;
+    margin-top: 60px;
+    margin-bottom: 20px;
+    filter: drop-shadow(4px 4px 0 #87ceeb);
+    position: relative;
+    z-index: 10;
+}
+
+/* Signup Main */
+.signup-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+}
+
+/* Signup Card */
+.signup-card {
+    background: white;
+    border: 3px solid #1a1a1a;
+    border-radius: 20px;
+    padding: 30px 40px;
+    width: 380px;
+    /* 확장하여 RETYPE PS 공간 확보 */
+    box-shadow: 4px 4px 0 #1a1a1a;
+}
+
+.signup-card-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a1a;
+    text-align: center;
+    margin-bottom: 24px;
+    font-family: 'Fredoka', sans-serif;
+}
+
+/* Form */
+.signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.form-row label {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    font-family: 'Fredoka', sans-serif;
+    min-width: 110px;
+    /* 모든 라벨 너비 통일 */
+    text-align: right;
+    /* 우측 정렬로 텍스트 끝라인 맞춤 */
+}
+
+.form-row input {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid #1a1a1a;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: 'Fredoka', sans-serif;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.form-row input:focus {
+    box-shadow: 2px 2px 0 #1a1a1a;
+}
+
+/* Finish Button */
+.btn-finish {
+    background: #ffe135;
+    color: #1a1a1a;
+    border: 2px solid #1a1a1a;
+    padding: 12px 32px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Fredoka', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 3px 3px 0 #1a1a1a;
+    margin-top: 8px;
+}
+
+.btn-finish:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #1a1a1a;
+}
+
+.btn-finish:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #1a1a1a;
+}
+
+.btn-finish:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Error */
+.signup-error {
+    background: #fee;
+    color: #c00;
+    padding: 10px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* Password Error Message */
+.password-error-msg {
+    color: #e53e3e;
+    /* Red color */
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 4px;
+    margin-left: 122px;
+    /* 110px label + 12px gap */
+    font-family: 'Fredoka', sans-serif;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.form-group-password {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Subtitle */
+.signup-subtitle {
+    font-size: 24px;
+    color: white;
+    margin-top: 30px;
+    font-weight: 400;
+    font-family: 'Lemon', cursive;
+    -webkit-text-stroke: 2px black;
+    position: relative;
+    z-index: 10;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .signup-header {
+        padding: 16px 24px;
+    }
+
+    .signup-title-img {
+        width: 280px;
+        margin-top: 50px;
+    }
+
+    .signup-card {
+        width: 90%;
+        max-width: 320px;
+        padding: 24px 28px;
+    }
+
+    .signup-subtitle {
+        font-size: 18px;
+    }
+}
+
+/* Login Page Specific Overrides */
+.login-card {
+    width: 320px;
+    padding-left: 20px;
+    /* 전체 폼 왼쪽 이동 효과 */
+    padding-right: 20px;
+}
+
+.login-card .form-row label {
+    min-width: 35px;
+    /* 라벨 너비 최소화 */
+    text-align: right;
+    margin-right: 4px;
+    /* gap 대신 마진으로 미세 조정 */
+}
+
+.login-card .form-row {
+    justify-content: flex-start;
+    /* 왼쪽 정렬 */
+    gap: 8px;
+    /* 라벨과 입력창 사이 간격 축소 */
+    padding-left: 20px;
+    /* 폼 요소 전체를 왼쪽 여백 추가하여 배치 */
+}
+
+.login-card input {
+    flex: unset;
+    /* flex: 1 해제하여 입력창 크기 고정 */
+    width: 180px;
+    /* 입력창 너비 고정 */
+}

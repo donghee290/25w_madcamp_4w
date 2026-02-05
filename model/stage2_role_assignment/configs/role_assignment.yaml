@@ -1,0 +1,165 @@
+version: 1
+
+audio:
+  # CLAP 표준에 맞춰 16kHz mono 권장
+  target_sr: 16000
+  mono: true
+
+  # 원샷 기준 권장 길이 (너무 길면 자르기)
+  max_duration_sec: 2.0
+  trim_silence: true
+  trim_top_db: 30          # librosa.effects.trim top_db
+  peak_normalize: true
+  peak_target: 0.95
+
+dsp:
+  # 대역 비율 계산용 Hz 범위
+  band_edges_hz:
+    low: [20, 150]
+    mid: [150, 2000]
+    high: [2000, 8000]
+
+  # 특징 추출 파라미터(기본값)
+  frame_length: 1024
+  hop_length: 256
+
+  # attack/decay 계산용 (초 단위)
+  attack_window_sec: 0.08
+  decay_window_sec: 0.60
+
+  # rule score softmax temperature
+  tau_rule: 0.2
+
+rule_scoring:
+  # 동바님 기본 가중치(필요 시 조정)
+  weights:
+    core:
+      L: 0.40
+      A_fast: 0.25
+      D_short: 0.25
+      one_minus_S: 0.10
+    accent:
+      E: 0.35
+      S: 0.35
+      M: 0.20
+      D_short: 0.10
+    motion:
+      H: 0.40
+      one_minus_E: 0.20
+      D_short: 0.25
+      S: 0.15
+    fill:
+      E: 0.30
+      D: 0.35
+      S: 0.25
+      M: 0.10
+    texture:
+      D: 0.45
+      one_minus_S: 0.25
+      L_plus_M: 0.20
+      one_minus_E: 0.10
+
+  # 텍스처 쏠림 방지용 패널티(중요)
+  texture_penalty:
+    enabled: true
+    # transient(날카로움)가 충분히 큰 타격성 원샷이면 텍스처 점수 감점
+    transient_S_threshold: 0.55
+    decay_short_threshold: 0.35
+    penalty: 0.18
+
+    # 노이즈성(flatness)가 낮은데도 텍스처로 튀는 것 방지(선택)
+    use_flatness_gate: true
+    flatness_threshold: 0.18
+    flatness_penalty: 0.10
+
+clap:
+  backend: "transformers"     # transformers | msclap (추후 교체 가능)
+  model_id: "laion/clap-htsat-unfused"
+
+  # 오디오 임베딩 계산 방식
+  # - 원샷이라도 모델이 내부적으로 프레임을 나눌 수 있어 pooling이 필요할 수 있음
+  audio_pooling: "mean"       # mean | max
+
+  # CLAP 점수 softmax temperature (모델 출력 스케일에 따라 조정)
+  tau_clap: 0.07
+
+  # 프롬프트 텍스트 임베딩 캐시
+  cache_text_embeddings: true
+  cache_dir: ".cache/clap_text"
+
+fusion:
+  # p_final = alpha * p_rule + (1-alpha) * p_clap
+  alpha: 0.9
+
+  # 최종 분류의 애매함 기준(마진)
+  confidence_margin_threshold: 0.12
+
+guards:
+  enabled: true
+
+  # 1) 타격성 강하면 TEXTURE 억제
+  texture_suppress:
+    transient_S_threshold: 0.60
+    decay_short_threshold: 0.32
+    multiply: 0.60
+
+  # 2) 매우 지속적/노이즈성이면 CORE/ACCENT 억제
+  sustained_noise_suppress:
+    decay_long_threshold: 0.70
+    flatness_threshold: 0.25
+    core_multiply: 0.65
+    accent_multiply: 0.75
+
+  # 3) MOTION 최소 조건(고역/짧음)
+  motion_min_condition:
+    high_ratio_threshold: 0.33
+    decay_max_threshold: 0.55
+    multiply: 0.70
+
+  # 4) FILL은 확신할 때만 (보수적으로)
+  fill_conservative:
+    min_prob: 0.35
+    min_margin: 0.12
+    multiply: 0.70
+
+  # 5) conf 낮을 때 TEXTURE가 1등이면 추가 억제(타격계열이 2등일 때)
+  low_conf_texture_extra_suppress:
+    enabled: true
+    margin_threshold: 0.10
+    multiply: 0.80
+    percussive_roles: ["CORE", "ACCENT", "MOTION", "FILL"]
+
+pool:
+  # 필수 풀
+  required_roles: ["CORE", "ACCENT", "MOTION"]
+
+  # 상한(필수 3개만 관리, 나머지는 자유)
+  max_sizes:
+    CORE: 4
+    ACCENT: 4
+    MOTION: 10
+
+  # 비어있을 때 승격 규칙
+  promote_when_missing:
+    enabled: true
+    # 승격 후보는 p_final 기준 상위에서 뽑되, 아래 조건 위반 시 제외
+    # (예: 너무 지속적인데 CORE로 승격 금지)
+    forbid_core_if:
+      decay_long_threshold: 0.75
+      flatness_threshold: 0.25
+    forbid_motion_if:
+      high_ratio_threshold: 0.25
+
+  # 과다일 때 이동 규칙
+  rebalance_when_excess:
+    enabled: true
+    # margin = p(role) - max(p(other))
+    min_margin_keep: 0.08
+    # 다른 역할로 이동할 때 2등 역할 우선, 과다이면 3등 시도
+    try_third_best_if_target_excess: true
+
+output:
+  # 역할별 pool 출력 파일명(기존 파이프라인과 맞추면 됨)
+  pools_json: "role_pools.json"
+  # 각 샘플별 상세 점수/특징 저장(디버깅용)
+  per_sample_json: "role_assignment_debug.json"

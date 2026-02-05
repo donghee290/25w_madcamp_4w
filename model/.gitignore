@@ -1,11 +1,3 @@
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.npm
-.yarn
-
 # Python
 __pycache__/
 *.pyc
@@ -18,14 +10,12 @@ outs/
 outs_grid/
 outs_model/
 outs_role/
+outs_transformer/
 examples/
-input_samples/
+inputs/
 
 # System
 .DS_Store
-
-# Backup
-backup_2026-02-04/
 
 # Distribution / packaging
 build/
@@ -130,5 +120,4 @@ cython_debug/
 
 # Large Models & Checkpoints
 checkpoints/
-groovae_output_*.midmodel/stage4_model_gen/drums_transformer/models/
-*.pth
+groovae_output_*.mid

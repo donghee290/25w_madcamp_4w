@@ -1,0 +1,217 @@
+/* Landing Page Styles - Brutalist Doodle Style */
+
+:root {
+  --google-blue: #4285f4;
+  --google-red: #ea4335;
+  --google-yellow: #fbbc05;
+  --google-green: #34a853;
+}
+
+.landing-container {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f8f8;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Doodle Background Pattern */
+.landing-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M30 40 L33 48 L42 48 L35 53 L38 62 L30 56 L22 62 L25 53 L18 48 L27 48 Z'/%3E%3Ccircle cx='150' cy='30' r='8'/%3E%3Ccircle cx='160' cy='35' r='6'/%3E%3Cpath d='M80 80 L85 75 L90 80 L85 85 Z'/%3E%3Cpath d='M170 120 Q180 110 190 120 T210 120' stroke-width='2'/%3E%3Ctext x='40' y='150' font-size='24' fill='%23888'%3E♪%3C/text%3E%3Ctext x='160' y='180' font-size='20' fill='%23888'%3E♫%3C/text%3E%3Ccircle cx='100' cy='170' r='10' stroke-dasharray='3,3'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpath d='M40 60 C40 50 50 45 55 55 C60 45 70 50 70 60 C70 75 55 85 55 85 C55 85 40 75 40 60'/%3E%3Cpath d='M130 40 L140 55 L130 70 L120 55 Z'/%3E%3Ccircle cx='80' cy='130' r='12'/%3E%3Cpath d='M150 140 L155 130 L160 140 L165 130 L170 140'/%3E%3Ctext x='20' y='130' font-size='22' fill='%23999'%3E☆%3C/text%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpath d='M50 100 Q55 90 65 95 Q70 85 85 90 Q95 85 100 95 Q110 90 110 100 Q115 105 110 110 L50 110 Q45 105 50 100'/%3E%3Crect x='150' y='50' width='30' height='25' rx='3'/%3E%3Ccircle cx='180' cy='150' r='15' stroke-dasharray='5,3'/%3E%3Cpath d='M30 180 L45 165 L60 180'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 400px 400px, 360px 360px, 440px 440px;
+  background-position: 0 0, 50px 80px, 100px 40px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Header */
+.landing-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 20px 40px;
+  z-index: 10;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon-img {
+  width: 36px;
+  height: auto;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: 'Fredoka', sans-serif;
+  text-shadow: 2px 2px 0 #ffd700;
+}
+
+/* Main Content Area */
+.landing-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+/* Title Image */
+/* Title Image (Deprecated) & Text Fallback */
+.landing-title-img {
+  width: 500px;
+  max-width: 90%;
+  height: auto;
+  margin-bottom: 12px;
+  filter: drop-shadow(4px 4px 0 #87ceeb);
+}
+
+.landing-title-text {
+  font-size: 80px;
+  /* Bigger for landing page */
+  font-weight: 700;
+  color: white;
+  font-family: 'Fredoka One', cursive;
+  /* Fredoka One 적용 */
+  -webkit-text-stroke: 3px black;
+  text-shadow: 6px 6px 0 #87ceeb;
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 10;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.landing-subtitle {
+  font-size: 24px;
+  color: white;
+  margin-bottom: 40px;
+  font-weight: 400;
+  font-family: 'Lemon', cursive;
+  -webkit-text-stroke: 2px black;
+  letter-spacing: 0;
+}
+
+/* Buttons Container */
+.landing-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Try SoundRoutine Button - Primary Yellow */
+.btn-try {
+  background: linear-gradient(180deg, #ffe135 0%, #ffc800 100%);
+  color: #1a1a1a;
+  border: 2px solid #1a1a1a;
+  padding: 14px 32px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'Fredoka', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 3px 3px 0 #1a1a1a;
+}
+
+.btn-try:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #1a1a1a;
+}
+
+.btn-try:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #1a1a1a;
+}
+
+/* Auth Buttons */
+.btn-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 2px solid #1a1a1a;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Fredoka', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-auth:hover {
+  background: #f5f5f5;
+}
+
+.btn-auth:active {
+  background: #eee;
+}
+
+/* Drum Icon */
+.btn-drum-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .landing-header {
+    padding: 16px 24px;
+  }
+
+  .logo-icon-img {
+    width: 28px;
+  }
+
+  .logo-text {
+    font-size: 18px;
+  }
+
+  .landing-title {
+    font-size: 48px;
+    -webkit-text-stroke: 2px black;
+  }
+
+  .landing-subtitle {
+    font-size: 18px;
+    margin-bottom: 30px;
+  }
+
+  .landing-buttons {
+    flex-direction: column;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .btn-try,
+  .btn-auth {
+    width: 100%;
+    justify-content: center;
+  }
+}
