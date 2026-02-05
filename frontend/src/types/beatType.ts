@@ -72,6 +72,7 @@ export interface ProjectContextState {
     generateBeat: (customName?: string) => Promise<void>;
     regenerate: (fromStage: number, params?: Partial<PipelineConfig>) => Promise<void>;
     updateConfig: (updates: Partial<PipelineConfig>) => Promise<void>;
+    saveRoles: () => Promise<void>;
     downloadUrl: (format?: string) => string;
     previewUrl: () => string;
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
 
 const ControlPanel = () => {
-    const { config, updateConfig, regenerate, downloadUrl } = useProject();
+    const { config, updateConfig, regenerate, downloadUrl, saveRoles, isGenerating } = useProject();
     const [exportFormat, setExportFormat] = useState('mp3');
 
     const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,8 +68,12 @@ const ControlPanel = () => {
 
                 {/* Actions */}
                 <div className="space-y-4">
-                    <button className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                        Save Project
+                    <button
+                        onClick={saveRoles}
+                        disabled={isGenerating}
+                        className={`w-full py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                    >
+                        {isGenerating ? 'Saving...' : 'Save Project'}
                     </button>
                 </div>
             </div>

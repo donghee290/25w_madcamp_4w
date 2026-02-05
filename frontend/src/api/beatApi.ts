@@ -150,6 +150,16 @@ export const beatApi = {
         return res.json();
     },
 
+    async saveRoles(beatName: string, roles: Record<RoleType, string[]>): Promise<{ ok: boolean; pools_path?: string; error?: string }> {
+        const res = await fetch(`${API_BASE}/api/beats/${beatName}/roles`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roles })
+        });
+        if (!res.ok) throw new Error('Failed to save roles');
+        return res.json();
+    },
+
     async getJobStatus(jobId: string): Promise<JobCheckResponse> {
         const res = await fetch(`${API_BASE}/api/jobs/${jobId}`);
         if (!res.ok) throw new Error('Failed to check job');

@@ -225,6 +225,107 @@ def update_config(beat_name: str):
     return jsonify({"ok": True, "config": current_config})
 
 
+@beats_bp.patch("/api/beats/<beat_name>/roles")
+def save_roles(beat_name: str):
+    """
+    Saves user-modified role mappings.
+    Creates a new role_pools JSON file and updates state.
+    """
+    data = request.json or {}
+    roles = data.get("roles")  # { "CORE": ["sample1.wav"], "ACCENT": [...], ... }
+    
+    if not roles:
+        return jsonify({"ok": False, "error": "No roles provided"}), 400
+
+    DEFAULT_OUTS_DIR = current_app.config["DEFAULT_OUTS_DIR"]
+    state = get_state_manager().get_state(beat_name)
+    
+    # Get the preprocessed samples directory for full paths
+    s1_dir = state.get("latest_s1_dir")
+    if not s1_dir:
+        s1_dir = str(DEFAULT_OUTS_DIR / beat_name / "1_preprocess" / "stage1_1")
+    
+    # Try to find the samples directory inside s1_dir
+    s1_path = Path(s1_dir)
+    samples_dir = s1_path / "samples"
+    if not samples_dir.exists():
+        samples_dir = s1_path / "master_kit" / "samples"
+    if not samples_dir.exists():
+        # Last resort: use s1_dir itself
+        samples_dir = s1_path
+    
+    # Build role_pools JSON in the expected format
+    role_pools = {"counts": {}}
+    for role_key in ["CORE", "ACCENT", "MOTION", "FILL", "TEXTURE"]:
+        pool_key = f"{role_key}_POOL"
+        samples = roles.get(role_key, [])
+        role_pools["counts"][role_key] = len(samples)
+        role_pools[pool_key] = []
+        
+        for sample_name in samples:
+            # sample_name might be "kick_001" (without extension) from frontend
+            # Try to find the actual file with extension
+            sample_path = None
+            
+            # Check if sample_name already has extension
+            if Path(sample_name).suffix in ['.wav', '.mp3', '.m4a', '.flac']:
+                # Try direct path
+                direct_path = samples_dir / sample_name
+                if direct_path.exists():
+                    sample_path = direct_path
+            
+            if not sample_path:
+                # Try with common extensions
+                for ext in ['.wav', '.mp3', '.m4a', '.flac']:
+                    base_name = sample_name.rsplit('.', 1)[0] if '.' in sample_name else sample_name
+                    try_path = samples_dir / f"{base_name}{ext}"
+                    if try_path.exists():
+                        sample_path = try_path
+                        break
+            
+            if not sample_path:
+                # Fallback: search recursively in s1_dir
+                found = list(s1_path.rglob(f"{sample_name}*"))
+                if found:
+                    sample_path = found[0]
+                else:
+                    # Last resort: construct expected path
+                    sample_path = samples_dir / f"{sample_name}.wav"
+            
+            role_pools[pool_key].append({
+                "sample_id": sample_path.stem if sample_path else sample_name,
+                "filepath": str(sample_path),
+                "role": role_key
+            })
+    
+    # Save to 2_role directory with versioned filename
+    role_dir = DEFAULT_OUTS_DIR / beat_name / "2_role"
+    role_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find next version number
+    existing = list(role_dir.glob("role_pools_*.json"))
+    if existing:
+        versions = []
+        for f in existing:
+            try:
+                v = int(f.stem.split("_")[-1])
+                versions.append(v)
+            except ValueError:
+                pass
+        next_ver = max(versions) + 1 if versions else 1
+    else:
+        next_ver = 1
+    
+    new_pools_path = role_dir / f"role_pools_{next_ver}.json"
+    with open(new_pools_path, "w", encoding="utf-8") as f:
+        json.dump(role_pools, f, ensure_ascii=False, indent=2)
+    
+    # Update state
+    get_state_manager().update_state(beat_name, {"latest_pools_json": str(new_pools_path)})
+    
+    return jsonify({"ok": True, "pools_path": str(new_pools_path)})
+
+
 @beats_bp.post("/api/beats/<beat_name>/regenerate")
 def regenerate(beat_name: str):
     data = request.json or {}
