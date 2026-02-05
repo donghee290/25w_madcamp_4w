@@ -62,21 +62,29 @@ def main():
     if args.mp3 == 1 and target_format == "wav":
         target_format = "mp3"
 
-    ver = get_next_version(out_dir, args.name, target_format)
+    # Logic Change: Use exact name first. If exists, then append version.
     
-    # We always render to WAV first (as intermediate or final)
-    # If target is WAV, this is final.
-    # If target is others, this is temp (or we keep it? User might want intermediate wav?)
-    # Usually pipelines keep intermediate wav or overwrite. 
-    # Let's save as `tmp.wav` or strict name if target is wav.
+    # Try exact name
+    base_path = out_dir / f"{args.name}.{target_format}"
+    
+    if not base_path.exists():
+        final_path = base_path
+        ver = 0 # Indicates no version suffix
+    else:
+        # Conflict -> use versioning
+        ver = get_next_version(out_dir, args.name, target_format)
+        final_path = out_dir / f"{args.name}_{ver}.{target_format}"
 
     if target_format == "wav":
-        final_path = out_dir / f"{args.name}_{ver}.wav"
         temp_wav = final_path
     else:
-        # Temp wav file
-        final_path = out_dir / f"{args.name}_{ver}.{target_format}"
-        temp_wav = out_dir / f"{args.name}_{ver}_temp.wav"
+        # If we need conversion, we need a temp wav.
+        # If no version (ver=0), we can't use {name}_{ver}_temp.wav nicely.
+        # Let's use a clear temp name.
+        if ver == 0:
+            temp_wav = out_dir / f"{args.name}_temp.wav"
+        else:
+             temp_wav = out_dir / f"{args.name}_{ver}_temp.wav"
 
     render_wav_from_event_grid(
         grid_json_path=args.grid_json,

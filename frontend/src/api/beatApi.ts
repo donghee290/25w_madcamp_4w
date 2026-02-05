@@ -161,6 +161,10 @@ export const beatApi = {
         return `${API_BASE}/api/beats/${beatName}/download?kind=${kind}`;
     },
 
+    getPreviewUrl(beatName: string): string {
+        return `${API_BASE}/api/beats/${beatName}/preview`;
+    },
+
     getSampleUrl(beatName: string, filename: string): string {
         return `${API_BASE}/api/beats/${beatName}/samples/${filename}`;
     }

@@ -73,8 +73,8 @@ export interface ProjectContextState {
     regenerate: (fromStage: number, params?: Partial<PipelineConfig>) => Promise<void>;
     updateConfig: (updates: Partial<PipelineConfig>) => Promise<void>;
     downloadUrl: (format?: string) => string;
+    previewUrl: () => string;
 
-    // Playback Sync
     // Playback Sync
     playbackState: {
         isPlaying: boolean;

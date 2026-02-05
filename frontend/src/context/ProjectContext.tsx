@@ -192,8 +192,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
             // Include beat_title in config if provided
             const finalConfig = customName ? { ...config, beat_title: customName } : config;
-            const res = await beatApi.generateInitial(beatName, finalConfig);
+            const res = await beatApi.generateInitial(beatName, finalConfig) as any;
             if (res.ok && res.job_id) {
+                if (res.new_beat_name) {
+                    console.log(`[ProjectContext] Project renamed to: ${res.new_beat_name}`);
+                    setBeatName(res.new_beat_name);
+                }
                 setJobId(res.job_id); // Start polling
             } else {
                 setIsGenerating(false);
@@ -235,6 +239,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return beatApi.getDownloadUrl(beatName, format);
     };
 
+    const previewUrl = () => {
+        if (!beatName) return '';
+        return beatApi.getPreviewUrl(beatName);
+    };
+
     const value: ProjectContextState = {
         beatName,
         isConnected,
@@ -257,6 +266,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         regenerate,
         updateConfig,
         downloadUrl,
+        previewUrl,
 
         playbackState,
         setPlaybackState,

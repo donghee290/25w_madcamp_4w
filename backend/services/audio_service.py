@@ -39,10 +39,20 @@ class AudioService:
 
         try:
             latest = self.get_latest_output(beat_name)
-            path_str = latest.get(f"{kind}_path")
+            path_str = latest.get(f"{kind}_path") 
+            # If kind is mp3/flac/etc, get_latest_output might return empty string if only wav exists.
+            # But get_latest_output (my modified version) attempts to return wav_path even if mp3 missing.
+            # However, looking at logic:
+            # if kind="wav", key="wav_path", returns resolving path.
+            
             if path_str:
                 p = Path(path_str)
                 if p.exists():
+                    # FIX: If it is a preview file, we do NOT want to return it for download/export.
+                    # We want to force a high-quality/properly named render.
+                    if p.name.startswith("preview_"):
+                         # Effectively "not found" for export purposes
+                         raise FileNotFoundError("Found only preview file, need final render")
                     return p
         except FileNotFoundError:
             pass
@@ -55,6 +65,8 @@ class AudioService:
     def get_latest_output(self, beat_name: str) -> Dict:
         # Prefer state.json
         state = self.state_manager.get_state(beat_name)
+        
+        # 1. Try finding Stage 7 Final output (WAV or MP3)
         if state.get("latest_mp3") and Path(state["latest_mp3"]).exists():
              return {
                 "beat_name": beat_name,
@@ -62,27 +74,64 @@ class AudioService:
                 "wav_path": state.get("latest_wav", ""),
                 "state": state
             }
+        
+        if state.get("latest_wav") and Path(state["latest_wav"]).exists():
+             return {
+                "beat_name": beat_name,
+                # If only WAV exists, we can return it as "mp3_path" field if caller expects some audio path,
+                # OR we return wav_path.
+                # However, frontend usually asks for result.mp3_path or result.wav_path.
+                # Let's populate what we have.
+                "mp3_path": "", 
+                "wav_path": state["latest_wav"],
+                "state": state
+            }
             
-        # Fallback to old glob method if state is missing
+        # 2. Global fallback to Stage 7
         beat_name = beat_name.strip()
         output_root = (self.outs_root / beat_name).resolve()
         final_dir = output_root / "7_final"
-        if not final_dir.exists():
-            raise FileNotFoundError(f"final dir not found: {final_dir}")
+        
+        if final_dir.exists():
+            mp3s = sorted(list(final_dir.glob("*.mp3")), key=lambda p: p.stat().st_mtime)
+            wavs = sorted(list(final_dir.glob("*.wav")), key=lambda p: p.stat().st_mtime)
+            
+            if mp3s:
+                latest_mp3 = mp3s[-1]
+                # Try to find corresponding wav by name
+                latest_wav = latest_mp3.with_suffix(".wav")
+                return {
+                    "beat_name": beat_name,
+                    "mp3_path": str(latest_mp3.resolve()),
+                    "wav_path": str(latest_wav.resolve()) if latest_wav.exists() else (str(wavs[-1].resolve()) if wavs else ""),
+                    "final_dir": str(final_dir.resolve()),
+                }
+            elif wavs:
+                latest_wav = wavs[-1]
+                return {
+                    "beat_name": beat_name,
+                    "mp3_path": "",
+                    "wav_path": str(latest_wav.resolve()),
+                    "final_dir": str(final_dir.resolve()),
+                }
 
-        mp3s = list(final_dir.glob("*_final.mp3"))
-        if not mp3s:
-            raise FileNotFoundError(f"No final mp3 found in: {final_dir}")
+        # 3. Fallback to Stage 6 Preview
+        # If no Stage 7 output, check Stage 6 preview
+        s6_dir = output_root / "6_editor"
+        if s6_dir.exists():
+            previews = list(s6_dir.glob("preview_*.wav"))
+            if previews:
+                latest_preview = max(previews, key=lambda p: p.stat().st_mtime)
+                # We return this as 'wav_path' effectively.
+                # Frontend might prefer mp3 path, but we only have wav.
+                return {
+                    "beat_name": beat_name,
+                    "mp3_path": "", # No MP3
+                    "wav_path": str(latest_preview.resolve()),
+                    "is_preview": True
+                }
 
-        latest_mp3 = max(mp3s, key=lambda p: p.stat().st_mtime)
-        latest_wav = latest_mp3.with_suffix(".wav")
-
-        return {
-            "beat_name": beat_name,
-            "mp3_path": str(latest_mp3.resolve()),
-            "wav_path": str(latest_wav.resolve()),
-            "final_dir": str(final_dir.resolve()),
-        }
+        raise FileNotFoundError(f"No audio output found for {beat_name} (checked s7 final and s6 preview)")
     
     def get_sample_path(self, beat_name: str, filename: str) -> Path:
         """Serves a specific sample from the 1_preprocess directory."""

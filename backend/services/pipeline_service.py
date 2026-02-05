@@ -58,10 +58,11 @@ class PipelineService:
         self,
         project_name: str,
         from_stage: int,
+        to_stage: int = 7,  # Added to_stage control
         config_overrides: Optional[Dict] = None
     ) -> Dict:
         """
-        Executes pipeline starting from `from_stage`.
+        Executes pipeline starting from `from_stage` up to `to_stage`.
         Reads inputs from `state.json` and updates it after each step.
         """
         beat_name = project_name
@@ -100,7 +101,7 @@ class PipelineService:
             d.mkdir(parents=True, exist_ok=True)
 
         # ---- Stage 1: Preprocess ----
-        if from_stage <= 1:
+        if from_stage <= 1 and to_stage >= 1:
             self.job_manager.update_job_progress(beat_name, "Running Stage 1: Preprocessing...")
             uploads_dir = state.get("uploads_dir")
             if not uploads_dir:
@@ -118,7 +119,7 @@ class PipelineService:
             state = self.state_manager.update_state(beat_name, {"latest_s1_dir": str(latest_s1)})
 
         # ---- Stage 2: Role Assignment ----
-        if from_stage <= 2:
+        if from_stage <= 2 and to_stage >= 2:
             self.job_manager.update_job_progress(beat_name, "Running Stage 2: Role Assignment...")
             latest_s1 = state.get("latest_s1_dir")
             if not latest_s1:
@@ -133,7 +134,7 @@ class PipelineService:
             state = self.state_manager.update_state(beat_name, {"latest_pools_json": str(pools_json)})
 
         # ---- Stage 3: Grid & Skeleton ----
-        if from_stage <= 3:
+        if from_stage <= 3 and to_stage >= 3:
             self.job_manager.update_job_progress(beat_name, "Running Stage 3: Grid & Skeleton...")
             pools_json = state.get("latest_pools_json")
             if not pools_json:
@@ -158,7 +159,7 @@ class PipelineService:
             })
 
         # ---- Stage 4: Transformer Gen ----
-        if from_stage <= 4:
+        if from_stage <= 4 and to_stage >= 4:
             self.job_manager.update_job_progress(beat_name, "Running Stage 4: AI Generation...")
             grid_json = state.get("latest_grid_json")
             skeleton_json = state.get("latest_skeleton_json")
@@ -200,7 +201,7 @@ class PipelineService:
             state = self.state_manager.update_state(beat_name, {"latest_transformer_json": str(notes_json)})
 
         # ---- Stage 5: Note & Layout ----
-        if from_stage <= 5:
+        if from_stage <= 5 and to_stage >= 5:
             self.job_manager.update_job_progress(beat_name, "Running Stage 5: Arrangement...")
             grid_json = state.get("latest_grid_json")
             notes_json = state.get("latest_transformer_json")
@@ -235,7 +236,7 @@ class PipelineService:
             })
 
         # ---- Stage 6: Editor ----
-        if from_stage <= 6:
+        if from_stage <= 6 and to_stage >= 6:
             self.job_manager.update_job_progress(beat_name, "Running Stage 6: Editor...")
             grid_json = state.get("latest_grid_json")
             event_grid = state.get("latest_event_grid_json")
@@ -257,7 +258,7 @@ class PipelineService:
             state = self.state_manager.update_state(beat_name, {"latest_editor_json": str(editor_events)})
 
         # ---- Stage 7: Render Final ----
-        if from_stage <= 7:
+        if from_stage <= 7 and to_stage >= 7:
             self.job_manager.update_job_progress(beat_name, "Running Stage 7: Rendering...")
             grid_json = state.get("latest_grid_json")
             editor_events = state.get("latest_editor_json")
@@ -273,19 +274,21 @@ class PipelineService:
                 name = f"{safe_title}_final"
             else:
                 name = f"{beat_name}_final"
+            
+            # Default render is usually wav/mp3 fallback? 
+            # We'll just run default which produces wav
             _run_step(self.project_root, self.pipeline_dir, "step7_run_render_final.py", [
                 "--grid_json", str(grid_json),
                 "--event_grid_json", str(editor_events),
                 "--sample_root", str(sample_root),
                 "--out_dir", str(dirs["s7"]),
                 "--name", name,
+                "--format", "wav" # Default
             ])
             
-            mp3_path = (dirs["s7"] / f"{name}.mp3").resolve()
             wav_path = (dirs["s7"] / f"{name}.wav").resolve()
             
             self.state_manager.update_state(beat_name, {
-                "latest_mp3": str(mp3_path),
                 "latest_wav": str(wav_path)
             })
 
@@ -302,6 +305,70 @@ class PipelineService:
             "wav_path": state_final.get("latest_wav", ""),
             "elapsed_sec": elapsed
         }
+
+    def run_export(self, beat_name: str, fmt: str) -> Path:
+        """
+        Runs ONLY Stage 7 for a specific format on demand.
+        Returns the absolute path to the generated file.
+        """
+        state = self.state_manager.get_state(beat_name)
+        project_dir = self._get_project_dir(beat_name)
+        
+        # Resolve inputs using latest state
+        grid_json = state.get("latest_grid_json")
+        editor_events = state.get("latest_editor_json")
+        sample_root = state.get("latest_s1_dir")
+        config = state.get("config", {})
+
+        dirs = {
+            "s3": project_dir / "3_grid",
+            "s6": project_dir / "6_editor",
+            "s1": project_dir / "1_preprocess",
+            "s7": project_dir / "7_final",
+        }
+        dirs["s7"].mkdir(parents=True, exist_ok=True)
+
+        # Fallbacks if state path is missing (try to guess latest in dir)
+        if not grid_json: grid_json = str(_get_latest_file(dirs["s3"], "grid_*.json"))
+        if not editor_events: editor_events = str(_get_latest_file(dirs["s6"], "event_grid_*.json"))
+        if not sample_root: sample_root = str(_get_latest_stage_dir(dirs["s1"], "stage1_"))
+
+        custom_title = config.get("beat_title")
+        if custom_title:
+            # Use exact title if provided, no suffix
+            safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in custom_title)
+            name = safe_title
+        else:
+            name = f"{beat_name}_final"
+
+        logger.info(f"Running on-demand export for {beat_name} -> {fmt}")
+        _run_step(self.project_root, self.pipeline_dir, "step7_run_render_final.py", [
+            "--grid_json", str(grid_json),
+            "--event_grid_json", str(editor_events),
+            "--sample_root", str(sample_root),
+            "--out_dir", str(dirs["s7"]),
+            "--name", name,
+            "--format", fmt
+        ])
+
+        # Resolve output path
+        # step7 produces: {name}.{fmt} OR {name}_{ver}.{fmt}
+        # Use glob that matches both cases
+        output_files = sorted(
+            list(dirs["s7"].glob(f"{name}.{fmt}")) + list(dirs["s7"].glob(f"{name}_[0-9]*.{fmt}")),
+            key=lambda p: p.stat().st_mtime
+        )
+        if not output_files:
+            raise FileNotFoundError(f"Export failed: Output file for {fmt} not found in {dirs['s7']}")
+        
+        final_path = output_files[-1]
+        
+        # Update state
+        self.state_manager.update_state(beat_name, {
+            f"latest_{fmt}": str(final_path)
+        })
+        
+        return final_path
 
     def run_pipeline(
         self,
