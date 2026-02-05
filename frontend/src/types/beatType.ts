@@ -76,7 +76,6 @@ export interface ProjectContextState {
     previewUrl: () => string;
 
     // Playback Sync
-    // Playback Sync
     playbackState: {
         isPlaying: boolean;
         currentTime: number;

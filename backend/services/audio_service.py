@@ -93,20 +93,21 @@ class AudioService:
         final_dir = output_root / "7_final"
         
         if final_dir.exists():
-            mp3s = list(final_dir.glob("*_final.mp3"))
-            wavs = list(final_dir.glob("*_final.wav"))
+            mp3s = sorted(list(final_dir.glob("*.mp3")), key=lambda p: p.stat().st_mtime)
+            wavs = sorted(list(final_dir.glob("*.wav")), key=lambda p: p.stat().st_mtime)
             
             if mp3s:
-                latest_mp3 = max(mp3s, key=lambda p: p.stat().st_mtime)
-                latest_wav = latest_mp3.with_suffix(".wav") # Assumption
+                latest_mp3 = mp3s[-1]
+                # Try to find corresponding wav by name
+                latest_wav = latest_mp3.with_suffix(".wav")
                 return {
                     "beat_name": beat_name,
                     "mp3_path": str(latest_mp3.resolve()),
-                    "wav_path": str(latest_wav.resolve()) if latest_wav.exists() else "",
+                    "wav_path": str(latest_wav.resolve()) if latest_wav.exists() else (str(wavs[-1].resolve()) if wavs else ""),
                     "final_dir": str(final_dir.resolve()),
                 }
             elif wavs:
-                latest_wav = max(wavs, key=lambda p: p.stat().st_mtime)
+                latest_wav = wavs[-1]
                 return {
                     "beat_name": beat_name,
                     "mp3_path": "",

@@ -3,7 +3,7 @@ import { useProject } from '../../context/ProjectContext';
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
 const PlayPreview = () => {
-    const { grid, isConnected, previewUrl, playbackState, setPlaybackState } = useProject();
+    const { beatName, grid, isConnected, previewUrl, playbackState, setPlaybackState } = useProject();
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -14,7 +14,7 @@ const PlayPreview = () => {
 
     // Fetch Preview URL when available
     useEffect(() => {
-        if (isConnected && grid) {
+        if (isConnected && beatName) {
             // Use preview endpoint which doesn't force render
             const url = previewUrl();
             console.log("[PlayPreview] Setting audioUrl:", url);
@@ -22,7 +22,7 @@ const PlayPreview = () => {
         } else {
             setAudioUrl('');
         }
-    }, [isConnected, grid]);
+    }, [isConnected, beatName, grid]); // Added beatName and grid to ensure re-sync after generation/rename
 
     // Sync with Context State (Remote Control)
     useEffect(() => {

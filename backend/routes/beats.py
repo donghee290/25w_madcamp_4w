@@ -95,26 +95,56 @@ def delete_file(beat_name: str, filename: str):
 def generate_initial(beat_name: str):
     """Runs the full pipeline (1-6) as a job. Stage 7 is on-demand."""
     data = request.json or {}
+    beat_title = str(data.get("beat_title", "")).strip()
+    
     config = {
         "bpm": float(data.get("bpm", 120.0)),
         "seed": int(data.get("seed", 42)),
         "style": str(data.get("style", "rock")),
         "progressive": bool(data.get("progressive", True)),
         "repeat_full": int(data.get("repeat_full", 2)),
-        "beat_title": str(data.get("beat_title", "")),
+        "beat_title": beat_title,
     }
     
-    get_state_manager().update_state(beat_name, {"config": config})
+    current_name = beat_name
+    new_beat_name = None
+
+    # Rename Project Folder if title is provided
+    if beat_title:
+        safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in beat_title)
+        # Try to extract timestamp from old name (pattern: something_YYYYMMDD_HHMMSS)
+        # We look for the last two underscore-separated parts if they match YYYYMMDD and HHMMSS
+        parts = current_name.split("_")
+        if len(parts) >= 3:
+             # Check if last two parts look like timestamp
+             if len(parts[-2]) == 8 and len(parts[-1]) == 6 and parts[-2].isdigit() and parts[-1].isdigit():
+                 timestamp = f"{parts[-2]}_{parts[-1]}"
+             else:
+                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        target_name = f"{safe_title}_{timestamp}"
+        if target_name != current_name:
+            try:
+                get_state_manager().rename_project(current_name, target_name)
+                current_name = target_name
+                new_beat_name = target_name
+            except Exception as e:
+                print(f"Rename failed: {e}")
+                # Continue with old name if rename fails
+
+    get_state_manager().update_state(current_name, {"config": config})
     
     pipeline = get_pipeline_service()
     job_id = get_job_manager().start_job(
         pipeline.run_from_stage,
-        project_name=beat_name,
+        project_name=current_name,
         from_stage=1,
         to_stage=6, # Stop at editor, wait for explicit export
         config_overrides=config
     )
-    return jsonify({"ok": True, "job_id": job_id})
+    return jsonify({"ok": True, "job_id": job_id, "new_beat_name": new_beat_name})
 
 
 @beats_bp.get("/api/beats/<beat_name>/state")
@@ -274,15 +304,18 @@ def preview_audio(beat_name: str):
         path_str = result.get("wav_path") or result.get("mp3_path")
         
         if not path_str or not os.path.exists(path_str):
-            return jsonify({"ok": False, "error": "No preview audio found"}), 404
+            # If no audio yet, return 204 (No Content) instead of 404 to avoid console errors in browser
+            return "", 204
             
         file_path = Path(path_str)
+        print(f"[preview] Serving {file_path}")
         return send_file(
             file_path,
             mimetype="audio/wav" if file_path.suffix == ".wav" else "audio/mpeg"
         )
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
+        print(f"[preview] Error: {e}")
+        return "", 204
 
 
 @beats_bp.get("/api/beats/<beat_name>/samples/<filename>")
