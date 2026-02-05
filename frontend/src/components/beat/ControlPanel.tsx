@@ -2,11 +2,27 @@ import React, { useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
 
 const ControlPanel = () => {
-    const { config, updateConfig, regenerate, downloadUrl } = useProject();
+    const { config, updateConfig, regenerate, downloadUrl, saveRoles, isGenerating, rolePools } = useProject();
     const [exportFormat, setExportFormat] = useState('mp3');
+    const [showRoleTooltip, setShowRoleTooltip] = useState(false);
 
     const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         updateConfig({ bpm: parseFloat(e.target.value) });
+    };
+
+    // Validate that CORE, ACCENT, MOTION each have at least one sound
+    const missingRoles = ['CORE', 'ACCENT', 'MOTION'].filter(
+        r => !rolePools || !rolePools[r as keyof typeof rolePools]?.length
+    );
+    const canSave = missingRoles.length === 0;
+
+    const handleSaveClick = () => {
+        if (!canSave) {
+            setShowRoleTooltip(true);
+            setTimeout(() => setShowRoleTooltip(false), 3000);
+            return;
+        }
+        saveRoles();
     };
 
     return (
@@ -67,10 +83,23 @@ const ControlPanel = () => {
                 <hr className="border-gray-100" />
 
                 {/* Actions */}
-                <div className="space-y-4">
-                    <button className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                        Save Project
+                <div className="space-y-4 relative">
+                    <button
+                        onClick={handleSaveClick}
+                        disabled={isGenerating}
+                        className={`w-full py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                    >
+                        {isGenerating ? 'Saving...' : 'Save Project'}
                     </button>
+                    {showRoleTooltip && (
+                        <div className="absolute bottom-full left-0 right-0 mb-2 z-50 flex justify-center">
+                            <div className="bg-white border-2 border-black rounded-full px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-in fade-in zoom-in duration-200">
+                                <p className="text-sm font-bold text-black whitespace-nowrap">
+                                    Core, Accent, and Motion must each have at least one sound.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

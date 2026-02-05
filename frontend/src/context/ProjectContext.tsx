@@ -226,6 +226,31 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
+    const saveRoles = async () => {
+        if (!beatName || !rolePools) return;
+        setIsGenerating(true);
+        try {
+            // 1. Save roles to backend
+            const saveRes = await beatApi.saveRoles(beatName, rolePools);
+            if (!saveRes.ok) {
+                throw new Error(saveRes.error || 'Failed to save roles');
+            }
+            console.log(`[ProjectContext] Roles saved to: ${saveRes.pools_path}`);
+
+            // 2. Regenerate from Stage 3
+            const res = await beatApi.regenerate(beatName, 3);
+            if (res.ok && res.job_id) {
+                setJobId(res.job_id); // Start polling
+            } else {
+                setIsGenerating(false);
+            }
+        } catch (e) {
+            console.error(e);
+            setIsGenerating(false);
+            alert('Failed to save and regenerate');
+        }
+    };
+
     const updateConfig = async (updates: Partial<PipelineConfig>) => {
         if (!beatName) return;
         setConfig(prev => ({ ...prev, ...updates }));
@@ -265,6 +290,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         generateBeat,
         regenerate,
         updateConfig,
+        saveRoles,
         downloadUrl,
         previewUrl,
 
