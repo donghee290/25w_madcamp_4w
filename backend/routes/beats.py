@@ -93,7 +93,7 @@ def delete_file(beat_name: str, filename: str):
 
 @beats_bp.post("/api/beats/<beat_name>/generate/initial")
 def generate_initial(beat_name: str):
-    """Runs the full pipeline (1-7) as a job."""
+    """Runs the full pipeline (1-6) as a job. Stage 7 is on-demand."""
     data = request.json or {}
     config = {
         "bpm": float(data.get("bpm", 120.0)),
@@ -110,6 +110,7 @@ def generate_initial(beat_name: str):
         pipeline.run_from_stage,
         project_name=beat_name,
         from_stage=1,
+        to_stage=6, # Stop at editor, wait for explicit export
         config_overrides=config
     )
     return jsonify({"ok": True, "job_id": job_id})
@@ -204,6 +205,9 @@ def regenerate(beat_name: str):
         pipeline.run_from_stage,
         project_name=beat_name,
         from_stage=from_stage,
+        to_stage=6, # Also stop at 6 for regenerate by default? Or full? 
+        # Usually regenerate implies you want to see/hear changes. 
+        # Since 6 provides preview, 6 is enough.
         config_overrides=overrides
     )
     return jsonify({"ok": True, "job_id": job_id})
@@ -232,10 +236,22 @@ def download(beat_name: str):
     if kind not in {"mp3", "wav", "flac", "ogg", "m4a"}:
         return jsonify({"ok": False, "error": "Supported formats: mp3, wav, flac, ogg, m4a"}), 400
 
+    file_path = None
     try:
+        # First try finding existing
         file_path = get_audio_service().convert_output(beat_name, kind)
+    except FileNotFoundError:
+        # Not found, try generating on demand
+        try:
+            print(f"[download] triggering on-demand export for {kind}...")
+            file_path = get_pipeline_service().run_export(beat_name, kind)
+        except Exception as e:
+             return jsonify({"ok": False, "error": f"Export generation failed: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 404
+
+    if not file_path or not file_path.exists():
+         return jsonify({"ok": False, "error": "File not found after export"}), 404
 
     return send_file(
         file_path,
