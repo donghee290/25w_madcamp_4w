@@ -26,8 +26,9 @@ def filter_by_roles(events: List[Event], allowed: set[str]) -> List[Event]:
     return [e for e in events if str(e.role).upper() in allowed]
 
 
-def shift_bars(events: List[Event], bar_offset: int) -> List[Event]:
+def shift_bars(events: List[Event], bar_offset: int, tbar: float) -> List[Event]:
     out: List[Event] = []
+    time_offset = float(bar_offset) * tbar
     for e in events:
         out.append(
             Event(
@@ -40,6 +41,8 @@ def shift_bars(events: List[Event], bar_offset: int) -> List[Event]:
                 dur_steps=e.dur_steps,
                 micro_offset_ms=getattr(e, "micro_offset_ms", 0.0),
                 source=getattr(e, "source", "progressive"),
+                start=e.start + time_offset,
+                end=e.end + time_offset,
                 extra=getattr(e, "extra", None),
             )
         )
@@ -54,7 +57,7 @@ def _has_any_role(events: List[Event], role: str) -> bool:
     return False
 
 
-def _fit_to_segment(events: List[Event], seg: int, base_len_override: int = None) -> List[Event]:
+def _fit_to_segment(events: List[Event], seg: int, tbar: float, base_len_override: int = None) -> List[Event]:
     """
     base_events는 보통 base_grid.num_bars 길이(예: 4bar)로 들어오는데,
     segment_bars=8로 늘리려면 "패턴을 반복"해서 seg 길이로 맞춘다.
@@ -84,12 +87,8 @@ def _fit_to_segment(events: List[Event], seg: int, base_len_override: int = None
     repeat = (seg + base_len - 1) // base_len  # ceil
     for r in range(repeat):
         offset = r * base_len
+        time_offset = float(offset) * tbar
         for e in events:
-            # 원본이 base_len보다 긴 경우(overflow)도 있는데,
-            # base_len_override가 있다면, 그 길이만큼은 "다음 루프"의 시작점과 겹치게 됨.
-            # 하지만 단순 반복을 위해 여기서는 nb = e.bar + offset으로 둔다.
-            # 만약 e.bar >= base_len_override라면, 다음 루프 영역에 찍히게 된다.
-            
             nb = int(e.bar) + offset
             if 0 <= nb < seg:
                 out.append(
@@ -103,6 +102,8 @@ def _fit_to_segment(events: List[Event], seg: int, base_len_override: int = None
                         dur_steps=e.dur_steps,
                         micro_offset_ms=getattr(e, "micro_offset_ms", 0.0),
                         source=getattr(e, "source", "progressive"),
+                        start=e.start + time_offset,
+                        end=e.end + time_offset,
                         extra=getattr(e, "extra", None),
                     )
                 )
@@ -156,10 +157,10 @@ def build_progressive_timeline(
         allowed.add(role.upper())
 
         layer_events = filter_by_roles(base_events, allowed)
-        layer_events = _fit_to_segment(layer_events, seg, cfg.base_loop_len)  # 핵심: 8bar segment에 맞게 반복/자르기
+        layer_events = _fit_to_segment(layer_events, seg, base_grid.tbar, cfg.base_loop_len)  # 핵심: 8bar segment에 맞게 반복/자르기
 
         bar_offset = i * seg
-        staged_events.extend(shift_bars(layer_events, bar_offset))
+        staged_events.extend(shift_bars(layer_events, bar_offset, base_grid.tbar))
 
         meta_segments.append(
             {
@@ -175,11 +176,11 @@ def build_progressive_timeline(
     current_seg_idx = len(effective_layers)
     if cfg.final_repeat > 0:
         final_events = filter_by_roles(base_events, allowed)
-        final_events = _fit_to_segment(final_events, seg, cfg.base_loop_len)
+        final_events = _fit_to_segment(final_events, seg, base_grid.tbar, cfg.base_loop_len)
 
         for r in range(int(cfg.final_repeat)):
             bar_offset = (current_seg_idx + r) * seg
-            staged_events.extend(shift_bars(final_events, bar_offset))
+            staged_events.extend(shift_bars(final_events, bar_offset, base_grid.tbar))
             meta_segments.append(
                 {
                     "segment_index": current_seg_idx + r,

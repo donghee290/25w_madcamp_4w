@@ -160,6 +160,8 @@ def normalize_notes_to_event_grid(
                 dur_steps=int(dur_steps),
                 micro_offset_ms=float(micro_ms),
                 source=str(source),
+                start=float(start),
+                end=float(end),
                 extra={
                     "pitch": n.get("pitch"),
                     "is_drum": n.get("is_drum"),
@@ -208,6 +210,8 @@ def dump_event_grid(events: List[Event]) -> List[Dict[str, Any]]:
                 "dur_steps": e.dur_steps,
                 "micro_offset_ms": e.micro_offset_ms,
                 "source": e.source,
+                "start": getattr(e, "start", 0.0),
+                "end": getattr(e, "end", 0.0),
             }
         )
     return arr

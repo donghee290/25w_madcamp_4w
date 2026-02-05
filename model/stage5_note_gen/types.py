@@ -29,4 +29,6 @@ class Event:
     dur_steps: int            # >=1
     micro_offset_ms: float    # ms
     source: str               # "model" | "skeleton" | ...
+    start: float = 0.0
+    end: float = 0.0
     extra: Optional[Dict[str, Any]] = None

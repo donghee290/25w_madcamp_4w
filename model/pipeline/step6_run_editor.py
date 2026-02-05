@@ -160,8 +160,20 @@ def apply_ui_snap(
     for e in events:
         e2 = dict(e)
 
-        start = float(e2.get("start", 0.0))
-        end = float(e2.get("end", start + tstep))
+        # FIX: If start/end is missing, calculate from bar/step
+        if "start" in e2:
+            start = float(e2["start"])
+        else:
+            b = int(e2.get("bar", 0))
+            k = int(e2.get("step", 0))
+            start = grid_pos_to_seconds(b, k, tbar, tstep)
+
+        if "end" in e2:
+            end = float(e2["end"])
+        else:
+            # use dur_steps or default to 1 step
+            dur_steps = int(e2.get("dur_steps", 1))
+            end = start + (dur_steps * tstep)
 
         bar, step, step_f = seconds_to_grid_pos(start, tbar, tstep, steps_per_bar)
 
