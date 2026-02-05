@@ -84,11 +84,6 @@ const SoundMaterial: React.FC<SoundMaterialProps> = ({ disabled = false }) => {
 
     if (!rolePools) return <div className="p-4">No roles assigned.</div>;
 
-    // Check if role requirements are met (example: Core, Accent, Motion need at least one)
-    // Matches logic in image "Core, Accent, and Motion must each have at least one sound."
-    const missingRoles = ['CORE', 'ACCENT', 'MOTION'].filter(r => !rolePools[r as RoleType]?.length);
-    const hasError = missingRoles.length > 0;
-
     // Helper to format name (remove extension)
     const formatName = (name: string) => name.replace(/\.[^/.]+$/, "");
 
@@ -142,12 +137,6 @@ const SoundMaterial: React.FC<SoundMaterialProps> = ({ disabled = false }) => {
                     </div>
                 ))}
             </div>
-
-            {hasError && (
-                <div className="p-4 border-t border-red-100 bg-red-50 text-red-600 text-xs font-bold">
-                    Core, Accent, and Motion must each have at least one sound.
-                </div>
-            )}
         </div>
     );
 };
