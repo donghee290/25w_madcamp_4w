@@ -39,10 +39,20 @@ class AudioService:
 
         try:
             latest = self.get_latest_output(beat_name)
-            path_str = latest.get(f"{kind}_path")
+            path_str = latest.get(f"{kind}_path") 
+            # If kind is mp3/flac/etc, get_latest_output might return empty string if only wav exists.
+            # But get_latest_output (my modified version) attempts to return wav_path even if mp3 missing.
+            # However, looking at logic:
+            # if kind="wav", key="wav_path", returns resolving path.
+            
             if path_str:
                 p = Path(path_str)
                 if p.exists():
+                    # FIX: If it is a preview file, we do NOT want to return it for download/export.
+                    # We want to force a high-quality/properly named render.
+                    if p.name.startswith("preview_"):
+                         # Effectively "not found" for export purposes
+                         raise FileNotFoundError("Found only preview file, need final render")
                     return p
         except FileNotFoundError:
             pass

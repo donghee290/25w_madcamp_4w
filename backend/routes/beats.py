@@ -101,6 +101,7 @@ def generate_initial(beat_name: str):
         "style": str(data.get("style", "rock")),
         "progressive": bool(data.get("progressive", True)),
         "repeat_full": int(data.get("repeat_full", 2)),
+        "beat_title": str(data.get("beat_title", "")),
     }
     
     get_state_manager().update_state(beat_name, {"config": config})

@@ -335,8 +335,9 @@ class PipelineService:
 
         custom_title = config.get("beat_title")
         if custom_title:
+            # Use exact title if provided, no suffix
             safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in custom_title)
-            name = f"{safe_title}_final"
+            name = safe_title
         else:
             name = f"{beat_name}_final"
 
