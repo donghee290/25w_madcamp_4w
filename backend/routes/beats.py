@@ -261,6 +261,29 @@ def download(beat_name: str):
         mimetype=f"audio/{kind}" if kind != "m4a" else "audio/mp4",
     )
 
+@beats_bp.get("/api/beats/<beat_name>/preview")
+def preview_audio(beat_name: str):
+    """
+    Serves the best available audio for playback (Preview or Final).
+    Does NOT force generation.
+    """
+    try:
+        # We can use get_latest_output which explicitly falls back to preview
+        result = get_audio_service().get_latest_output(beat_name)
+        # Prefer wav path usually for preview if mp3 might be missing
+        path_str = result.get("wav_path") or result.get("mp3_path")
+        
+        if not path_str or not os.path.exists(path_str):
+            return jsonify({"ok": False, "error": "No preview audio found"}), 404
+            
+        file_path = Path(path_str)
+        return send_file(
+            file_path,
+            mimetype="audio/wav" if file_path.suffix == ".wav" else "audio/mpeg"
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+
 
 @beats_bp.get("/api/beats/<beat_name>/samples/<filename>")
 def get_sample(beat_name: str, filename: str):

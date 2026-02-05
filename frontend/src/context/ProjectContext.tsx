@@ -235,6 +235,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return beatApi.getDownloadUrl(beatName, format);
     };
 
+    const previewUrl = () => {
+        if (!beatName) return '';
+        return beatApi.getPreviewUrl(beatName);
+    };
+
     const value: ProjectContextState = {
         beatName,
         isConnected,
@@ -257,6 +262,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         regenerate,
         updateConfig,
         downloadUrl,
+        previewUrl,
 
         playbackState,
         setPlaybackState,

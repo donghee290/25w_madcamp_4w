@@ -352,9 +352,12 @@ class PipelineService:
         ])
 
         # Resolve output path
-        # step7 produces: {name}_{ver}.{fmt}
-        # Use simple glob to find the latest of that name+format
-        output_files = sorted(dirs["s7"].glob(f"{name}_*.{fmt}"), key=lambda p: p.stat().st_mtime)
+        # step7 produces: {name}.{fmt} OR {name}_{ver}.{fmt}
+        # Use glob that matches both cases
+        output_files = sorted(
+            list(dirs["s7"].glob(f"{name}.{fmt}")) + list(dirs["s7"].glob(f"{name}_[0-9]*.{fmt}")),
+            key=lambda p: p.stat().st_mtime
+        )
         if not output_files:
             raise FileNotFoundError(f"Export failed: Output file for {fmt} not found in {dirs['s7']}")
         
