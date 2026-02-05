@@ -133,7 +133,7 @@ const BeatCanvas = () => {
                     {/* Lanes Container */}
                     <div className="flex flex-col gap-2">
                         {ROW_ORDER.map((role) => (
-                            <div key={role} className="flex hover:bg-gray-50 transition-colors rounded-lg overflow-hidden shrink-0" style={{ height: '28px', minHeight: '28px' }}>
+                            <div key={role} className="flex hover:bg-gray-50 transition-colors rounded-lg overflow-hidden shrink-0" style={{ height: '27px', minHeight: '27px' }}>
                                 {/* Role Label */}
                                 <div className="w-[80px] shrink-0 flex items-center justify-center border-r-0 h-full p-0">
                                     <div

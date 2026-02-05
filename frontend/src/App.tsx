@@ -1,6 +1,5 @@
 
-import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import BeatStudioPage from "./pages/BeatStudioPage";
 import LandingPage from "./pages/LandingPage";
 import StudioPage from "./pages/StudioPage";

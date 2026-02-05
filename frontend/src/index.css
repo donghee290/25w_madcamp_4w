@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@theme {
+    --font-family-sans: 'Lexend', system-ui, sans-serif;
+}
+
 /* Global Styles */
 * {
     margin: 0;
@@ -17,5 +21,5 @@ body,
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-family-sans);
 }
